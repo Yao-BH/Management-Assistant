@@ -1,133 +1,25 @@
-const employees = {
-  zhangsan: {
-    name: "张三",
-    employeeId: "E2024001",
-    role: "产品运营 · P6",
-    department: "产品部",
-    hireDate: "2025-08-12",
-    manager: "姚老师",
-    risk: 86,
-    level: "高风险",
-    reason: "连续加班 5 天，绩效从 B+ 下滑到 C，30 天未进行 1 对 1 沟通。",
-    evidence: ["近 7 天加班 28 小时", "Q1 绩效 B+ -> C", "上次沟通距今 30 天"],
-    goal: "确认压力来源，明确 Q2 目标调整与两周复盘动作。",
-    lifecycle: { stage: "成长期", detail: "入职 6-12 个月，重点关注目标承接、能力成长和稳定沟通节奏。" }
-  },
-  lisi: {
-    name: "李四",
-    employeeId: "E2023018",
-    role: "客户成功 · P6",
-    department: "客户成功部",
-    hireDate: "2023-05-20",
-    manager: "姚老师",
-    risk: 67,
-    level: "中风险",
-    reason: "合同节点临近，本月迟到 4 次，需要结合绩效与稳定性完成续签判断。",
-    evidence: ["合同 9 天后到期", "本月迟到 4 次", "近 30 天客户满意度稳定"],
-    goal: "确认续签意愿、近期状态和必要支持，形成续签建议。",
-    lifecycle: { stage: "稳定期", detail: "任职超过 1 年，当前重点是稳定性判断、续签意愿确认和关键客户交接风险。" }
-  },
-  wangwu: {
-    name: "王五",
-    employeeId: "E2026007",
-    role: "前端工程师 · P5",
-    department: "研发部",
-    hireDate: "2026-03-28",
-    manager: "姚老师",
-    risk: 48,
-    level: "低风险",
-    reason: "入职满 3 个月，尚未安排转正面谈，成长反馈节点临近。",
-    evidence: ["入职 92 天", "导师反馈尚未归档", "试用期目标完成率 82%"],
-    goal: "确认试用期目标完成情况，记录转正结论和后续成长支持。",
-    lifecycle: { stage: "适应期", detail: "入职 3 个月，处于试用期收口节点，需要完成转正判断和下一阶段成长目标。" }
-  }
-};
-
-const profileFallbacks = {
-  zhangsan: {
-    riskSummary: "连续加班 5 天，绩效从 B+ 下滑到 C，30 天未进行 1 对 1 沟通。目标完成率 72%，近期投入较高但结果波动明显，建议先确认压力来源。",
-    evidence: employees.zhangsan.evidence,
-    performance: "B+ -> C",
-    attendance: "加班 28h",
-    communication: "30 天未沟通",
-    suggestedAction: "安排 1 对 1",
-    lifecycleStage: "成长期",
-    lifecycleDetail: employees.zhangsan.lifecycle.detail
-  },
-  lisi: {
-    riskSummary: "合同节点临近，本月迟到 4 次，需要结合绩效、稳定性和续签意愿形成判断。",
-    evidence: employees.lisi.evidence,
-    performance: "客户满意稳定",
-    attendance: "迟到 4 次",
-    communication: "续签待评估",
-    suggestedAction: "完成续签评估",
-    lifecycleStage: "稳定期",
-    lifecycleDetail: employees.lisi.lifecycle.detail
-  },
-  wangwu: {
-    riskSummary: "入职满 3 个月，尚未安排转正面谈，导师反馈也未归档，需要完成试用期收口。",
-    evidence: employees.wangwu.evidence,
-    performance: "试用期 82%",
-    attendance: "出勤稳定",
-    communication: "转正未面谈",
-    suggestedAction: "完成转正面谈",
-    lifecycleStage: "适应期",
-    lifecycleDetail: employees.wangwu.lifecycle.detail
-  }
-};
-
-const fallbackMetrics = [
-  { key: "team", label: "员工档案", value: "12", detail: "已录入基础信息", tone: "pink" },
-  { key: "focus", label: "重点关注", value: "3", detail: "系统识别对象", tone: "blue" },
-  { key: "todo", label: "待办动作", value: "7", detail: "风险与节点生成", tone: "green" },
-  { key: "coverage", label: "沟通覆盖", value: "76%", detail: "来自沟通记录", tone: "amber" }
-];
-
-const fallbackBrief = {
-  title: "今日管理研判",
-  summary: "团队整体稳定，当前有 3 名员工需要管理层关注。优先处理张三的绩效与压力沟通，并跟进王五转正、李四合同续签节点。",
-  insights: [
-    { label: "优先处理", value: "张三绩效沟通", detail: "高风险 86，建议今日完成" },
-    { label: "主要风险因子", value: "加班 + 绩效 + 沟通缺失", detail: "3 个因子同时触发" },
-    { label: "关键节点", value: "转正面谈 + 合同续签", detail: "王五本周转正，李四 9 天后到期" }
-  ]
-};
-
-const fallbackOutlines = {
-  zhangsan: ["开场先认可近期投入，说明本次沟通希望先理解压力来源。", "询问连续加班主要来自任务量、协作阻塞还是目标不清。", "一起拆解 Q2 目标，明确优先级和需要协调的资源。", "约定两周后复盘，并确认下一次 1 对 1 时间。"],
-  lisi: ["先确认近期工作状态和续签意愿。", "讨论迟到原因，判断是否需要排班、通勤或个人状态支持。", "同步绩效与客户反馈，明确续签判断依据。", "本周内完成续签评估并记录风险观察点。"],
-  wangwu: ["说明转正面谈目标是复盘试用期表现和下一阶段成长方向。", "询问试用期最有成就感的任务以及仍需支持的能力。", "结合导师反馈确认技能短板，给出 30 天成长计划。", "归档转正结论并安排导师后续跟进。"]
-};
-
-const fallbackTodos = [
-  { id: "zhangsan", employeeKey: "zhangsan", priority: "P1", title: "张三绩效与压力沟通", badge: "高风险 · 今天", summary: "连续加班 5 天，绩效从 B+ 下滑到 C，30 天未沟通，建议今天完成一次 1 对 1。", tags: ["加班 28h", "绩效 B+ -> C", "30 天未沟通"], level: "high" },
-  { id: "lisi", employeeKey: "lisi", priority: "P2", title: "李四合同续签评估", badge: "中风险 · 9 天", summary: "合同节点临近，近期考勤异常，需要结合绩效与稳定性完成续签判断。", tags: ["合同 9 天后到期", "本月迟到 4 次", "客户满意度稳定"], level: "medium" },
-  { id: "wangwu", employeeKey: "wangwu", priority: "P3", title: "王五转正面谈", badge: "关键节点 · 本周", summary: "王五入职满 3 个月，试用期反馈尚未归档，建议本周内完成转正沟通。", tags: ["入职 92 天", "导师反馈待归档", "目标完成率 82%"], level: "low" }
-];
-
 const assistantHistory = [];
 
-let archiveEmployees = Object.entries(employees).map(([key, employee]) => ({
-  key,
-  name: employee.name,
-  employeeId: employee.employeeId,
-  department: employee.department,
-  role: employee.role,
-  hireDate: employee.hireDate,
-  manager: employee.manager,
-  lifecycle: employee.lifecycle.stage,
-  level: employee.level
-}));
+const employees = {};
+const profileFallbacks = {};
+const loadingBrief = {
+  title: "正在生成今日研判...",
+  summary: "正在结合数据库中的员工档案、沟通记录和待办生成研判。",
+  insights: []
+};
+const emptyBrief = {
+  title: "今日管理研判",
+  summary: "暂无可研判数据，请先补充员工档案或沟通记录。",
+  insights: []
+};
 
-let communicationRecords = [
-  { employee: "张三", date: "2026-06-29", type: "1 对 1", summary: "近期连续加班，需确认压力来源和目标优先级。", action: "今天完成绩效与压力沟通" },
-  { employee: "李四", date: "2026-06-28", type: "合同续签", summary: "合同 9 天后到期，需结合考勤和续签意愿评估。", action: "本周完成续签评估" }
-];
-
-let smartTodos = [...fallbackTodos];
+let archiveEmployees = [];
+let communicationRecords = [];
+let smartTodos = [];
 let selectedTodoId = "";
 let selectedFocusId = "";
-let currentBrief = fallbackBrief;
+let currentBrief = emptyBrief;
+let pendingEmployeeEdits = {};
 
 function initIcons() {
   if (window.lucide) window.lucide.createIcons();
@@ -198,8 +90,22 @@ function syncEmployeesFromArchive(list = archiveEmployees) {
       employeeId: employee.employeeId,
       department: employee.department,
       role: employee.role,
+      jobLevel: employee.jobLevel || "",
       hireDate: employee.hireDate,
       manager: employee.manager,
+      performanceRating: employee.performanceRating || "",
+      performanceTrend: employee.performanceTrend || "",
+      goalCompletionRate: employee.goalCompletionRate || 0,
+      overtimeHours30d: employee.overtimeHours30d || 0,
+      lateCount30d: employee.lateCount30d || 0,
+      leaveDays30d: employee.leaveDays30d || 0,
+      contractEndDate: employee.contractEndDate || "",
+      probationEndDate: employee.probationEndDate || "",
+      mentor: employee.mentor || "",
+      growthSummary: employee.growthSummary || "",
+      awardsSummary: employee.awardsSummary || "",
+      keyEvents: employee.keyEvents || "",
+      compensationSignal: employee.compensationSignal || "",
       risk: employee.risk || 0,
       level: employee.level || "待分析",
       reason: employee.reason || "",
@@ -258,13 +164,18 @@ function renderMetrics(items) {
   grid.innerHTML = "";
   const source = Array.isArray(items) && items.length ? items : deriveDashboardMetrics();
   const dashboardKeys = ["team", "focus", "todo"];
-  const visibleSource = dashboardKeys.map((key) => source.find((item) => item.key === key) || fallbackMetrics.find((item) => item.key === key)).filter(Boolean);
+  const metricDefaults = {
+    team: { key: "team", label: "员工档案", value: "0", detail: "来自数据库", tone: "pink" },
+    focus: { key: "focus", label: "重点关注", value: "0", detail: "暂无风险标记", tone: "blue" },
+    todo: { key: "todo", label: "待办动作", value: "0", detail: "暂无待办", tone: "green" }
+  };
+  const visibleSource = dashboardKeys.map((key) => source.find((item) => item.key === key) || metricDefaults[key]).filter(Boolean);
   const normalized = visibleSource.map((item, index) => ({
-    key: item.key || fallbackMetrics[index].key,
-    label: item.label || fallbackMetrics[index].label,
-    value: item.value || fallbackMetrics[index].value,
-    detail: item.detail || fallbackMetrics[index].detail,
-    tone: item.tone || fallbackMetrics[index].tone
+    key: item.key || dashboardKeys[index],
+    label: item.label || metricDefaults[dashboardKeys[index]].label,
+    value: item.value ?? metricDefaults[dashboardKeys[index]].value,
+    detail: item.detail || metricDefaults[dashboardKeys[index]].detail,
+    tone: item.tone || metricDefaults[dashboardKeys[index]].tone
   }));
   normalized.forEach((item) => {
     const card = document.createElement("article");
@@ -272,7 +183,7 @@ function renderMetrics(items) {
     card.innerHTML = `<strong>${escapeHtml(item.value)}</strong><span>${escapeHtml(item.label)}</span><small>${escapeHtml(item.detail)}</small>`;
     grid.appendChild(card);
   });
-  renderSignalBoard(normalized);
+  renderSignalBoard(source);
 }
 
 function metricValue(items, key, fallbackValue) {
@@ -289,7 +200,7 @@ function deriveDashboardMetrics() {
   const focusCount = archiveEmployees.filter(isRiskEmployee).length;
   const coveredEmployees = new Set(communicationRecords.map((record) => record.employee).filter(Boolean));
   const coverage = teamCount ? Math.round((coveredEmployees.size / teamCount) * 100) : 0;
-  const actionCount = Math.max(fallbackTodos.length, focusCount + communicationRecords.filter((record) => record.action).length);
+  const actionCount = smartTodos.length || focusCount + communicationRecords.filter((record) => record.action).length;
 
   return [
     { key: "team", label: "员工档案", value: String(teamCount), detail: "已录入基础信息", tone: "pink" },
@@ -303,18 +214,18 @@ function refreshDashboardMetrics() {
   renderMetrics(deriveDashboardMetrics());
 }
 
-function renderSignalBoard(items = fallbackMetrics) {
-  const team = metricValue(items, "team", "12");
-  const focus = metricValue(items, "focus", "3");
-  const todo = metricValue(items, "todo", "7");
-  const coverage = metricValue(items, "coverage", "76%");
-  const teamNumber = Number.parseInt(team, 10) || 12;
-  const focusNumber = Number.parseInt(focus, 10) || 3;
+function renderSignalBoard(items = deriveDashboardMetrics()) {
+  const team = metricValue(items, "team", "0");
+  const focus = metricValue(items, "focus", "0");
+  const todo = metricValue(items, "todo", "0");
+  const coverage = metricValue(items, "coverage", "0%");
+  const teamNumber = Number.parseInt(team, 10) || 0;
+  const focusNumber = Number.parseInt(focus, 10) || 0;
   const stableNumber = Math.max(teamNumber - focusNumber, 0);
-  const stableRate = Math.round((stableNumber / teamNumber) * 100);
-  const focusRate = Math.round((focusNumber / teamNumber) * 100);
-  const coverageNumber = Number.parseInt(coverage, 10) || 76;
-  const todoNumber = Number.parseInt(todo, 10) || 7;
+  const stableRate = teamNumber ? Math.round((stableNumber / teamNumber) * 100) : 0;
+  const focusRate = teamNumber ? Math.round((focusNumber / teamNumber) * 100) : 0;
+  const coverageNumber = Number.parseInt(coverage, 10) || 0;
+  const todoNumber = Number.parseInt(todo, 10) || 0;
   const health = Math.max(0, Math.min(100, Math.round(stableRate * 0.55 + coverageNumber * 0.35 - todoNumber * 1.2)));
   const setText = (selector, value) => {
     const node = document.querySelector(selector);
@@ -347,14 +258,14 @@ async function loadMetrics() {
 }
 
 function renderBrief(brief) {
-  currentBrief = { ...fallbackBrief, ...brief };
+  currentBrief = { ...emptyBrief, ...brief };
   const briefTitle = document.querySelector("[data-brief-title]");
   briefTitle.textContent = String(currentBrief.title || "").includes("正在") ? "正在生成今日重点关注..." : "今日重点关注";
-  document.querySelector("[data-brief-summary]").textContent = currentBrief.summary || fallbackBrief.summary;
+  document.querySelector("[data-brief-summary]").textContent = currentBrief.summary || emptyBrief.summary;
   const insights = document.querySelector("[data-brief-insights]");
   if (insights) {
     insights.innerHTML = "";
-    (currentBrief.insights || fallbackBrief.insights).slice(0, 3).forEach((item) => {
+    (currentBrief.insights || []).slice(0, 3).forEach((item) => {
       const card = document.createElement("div");
       card.innerHTML = `<span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong><small>${escapeHtml(item.detail)}</small>`;
       insights.appendChild(card);
@@ -364,11 +275,11 @@ function renderBrief(brief) {
 }
 
 async function loadBrief() {
-  renderBrief({ ...fallbackBrief, title: "正在生成今日研判..." });
+  renderBrief(loadingBrief);
   try {
     renderBrief(await postJson("/api/brief"));
   } catch {
-    renderBrief(fallbackBrief);
+    renderBrief(emptyBrief);
   }
 }
 
@@ -480,7 +391,7 @@ function renderFocusDetail(item) {
   const employeeKey = employees[item.employeeKey] ? item.employeeKey : Object.keys(employees)[0];
   const employee = employees[employeeKey] || {};
   const profile = profileFallbacks[employeeKey] || {};
-  const insights = (currentBrief.insights || fallbackBrief.insights).slice(0, 2);
+  const insights = (currentBrief.insights || []).slice(0, 2);
   detail.innerHTML = `
     <div class="focus-detail-hero ${escapeHtml(item.level || "medium")}">
       <span>${escapeHtml(item.priority || "P-")}</span>
@@ -647,6 +558,7 @@ function renderTodoDetail(item) {
       <button type="button" data-todo-outline><i data-lucide="wand-sparkles"></i><span>生成提纲</span></button>
       <button type="button" data-todo-complete><i data-lucide="check-circle-2"></i><span>记录沟通并完成</span></button>
       <button type="button" data-todo-status="已忽略"><i data-lucide="circle-slash"></i><span>忽略</span></button>
+      <button type="button" class="danger-action" data-todo-delete><i data-lucide="trash-2"></i><span>删除</span></button>
     </div>
   `;
   panel.querySelector("[data-todo-open-employee]")?.addEventListener("click", () => openEmployeeDrawer(item.employeeKey, item.id));
@@ -655,6 +567,7 @@ function renderTodoDetail(item) {
   panel.querySelectorAll("[data-todo-status]").forEach((button) => {
     button.addEventListener("click", () => updateTodoStatus(item.id, button.dataset.todoStatus));
   });
+  panel.querySelector("[data-todo-delete]")?.addEventListener("click", () => deleteTodo(item.id));
   initIcons();
 }
 
@@ -666,6 +579,22 @@ async function updateTodoStatus(todoId, status) {
   } catch {
     const item = todoById(todoId);
     if (item) item.status = status;
+    renderTodoWorkbench();
+    renderRiskTable(smartTodos);
+  }
+}
+
+async function deleteTodo(todoId) {
+  if (!todoId) return;
+  const item = todoById(todoId);
+  if (!confirm(`确定删除待办「${item?.title || todoId}」吗？`)) return;
+  try {
+    const result = await postJson("/api/todos/delete", { todoId });
+    selectedTodoId = "";
+    if (result.archive) applyArchivePayload(result.archive);
+  } catch {
+    smartTodos = smartTodos.filter((todo) => todo.id !== todoId);
+    selectedTodoId = "";
     renderTodoWorkbench();
     renderRiskTable(smartTodos);
   }
@@ -761,14 +690,24 @@ function closeOutlineModal() {
   document.querySelector("[data-outline-modal]")?.setAttribute("aria-hidden", "true");
 }
 
+function openEmployeeModal() {
+  document.querySelector("[data-employee-modal]")?.setAttribute("aria-hidden", "false");
+  initIcons();
+}
+
+function closeEmployeeModal() {
+  document.querySelector("[data-employee-modal]")?.setAttribute("aria-hidden", "true");
+}
+
 async function generateOutlineInModal(employeeKey) {
+  if (!employeeKey || !employees[employeeKey]) return;
   openOutlineModal();
   renderOutline(employeeKey, ["正在读取员工风险原因、近期事件和建议目标..."], "生成中");
   try {
     const result = await postJson("/api/outline", { employeeKey });
-    renderOutline(employeeKey, result.lines || fallbackOutlines[employeeKey], result.source || "DeepSeek");
+    renderOutline(employeeKey, result.lines || ["请先补充员工信息和沟通记录。"], result.source || "DeepSeek");
   } catch {
-    renderOutline(employeeKey, fallbackOutlines[employeeKey] || ["先确认员工当前状态。", "补充近期沟通记录。", "明确下一步管理动作。"], "本地智能模板");
+    renderOutline(employeeKey, ["先确认员工当前状态。", "补充近期沟通记录。", "明确下一步管理动作。"], "本地智能模板");
   }
 }
 
@@ -810,20 +749,28 @@ function bindEditableCells(scope) {
         cell.blur();
       }
     });
-    cell.addEventListener("blur", () => saveEditableCell(cell));
+    cell.addEventListener("blur", () => handleEditableCellBlur(cell));
   });
 }
 
-async function saveEditableCell(cell) {
+function setEmployeeSaveState() {
+  const button = document.querySelector("[data-save-employee-edits]");
+  if (!button) return;
+  const count = Object.keys(pendingEmployeeEdits).length;
+  button.disabled = count === 0;
+  button.querySelector("span").textContent = count ? `保存修改(${count})` : "保存修改";
+}
+
+async function handleEditableCellBlur(cell) {
   const value = cell.textContent.trim();
   if (value === (cell.dataset.originalValue || "")) return;
+  if (cell.dataset.editEntity === "employee") {
+    markEmployeeCellDirty(cell, value);
+    return;
+  }
   cell.classList.add("saving");
   try {
-    if (cell.dataset.editEntity === "employee") {
-      await saveEmployeeCell(cell.dataset.rowKey, cell.dataset.editKey, value);
-    } else {
-      await saveCommunicationCell(cell.dataset.rowKey, cell.dataset.editKey, value);
-    }
+    await saveCommunicationCell(cell.dataset.rowKey, cell.dataset.editKey, value);
     cell.dataset.originalValue = value;
     cell.classList.remove("error");
   } catch {
@@ -833,14 +780,62 @@ async function saveEditableCell(cell) {
   }
 }
 
-async function saveEmployeeCell(employeeKey, field, value) {
+function markEmployeeCellDirty(cell, value) {
+  const employeeKey = cell.dataset.rowKey;
+  const field = cell.dataset.editKey;
   const current = archiveEmployees.find((employee) => employee.key === employeeKey);
   if (!current) return;
   const updated = { ...current, [field]: value };
   archiveEmployees = archiveEmployees.map((employee) => employee.key === employeeKey ? updated : employee);
+  pendingEmployeeEdits[employeeKey] = updated;
+  cell.classList.add("dirty");
   syncEmployeesFromArchive(archiveEmployees);
-  const result = await postJson("/api/employees", { employee: updated });
-  if (result.archive) applyArchivePayload(result.archive);
+  setEmployeeSaveState();
+}
+
+async function savePendingEmployeeChanges() {
+  const updates = Object.values(pendingEmployeeEdits);
+  if (!updates.length) return;
+  const button = document.querySelector("[data-save-employee-edits]");
+  if (button) {
+    button.disabled = true;
+    button.querySelector("span").textContent = "保存中";
+  }
+  try {
+    for (const employee of updates) {
+      const result = await postJson("/api/employees", { employee });
+      if (result.archive) applyArchivePayload(result.archive);
+    }
+    pendingEmployeeEdits = {};
+    document.querySelectorAll('.editable-cell.dirty[data-edit-entity="employee"]').forEach((cell) => {
+      cell.dataset.originalValue = cell.textContent.trim();
+      cell.classList.remove("dirty", "error");
+    });
+    await loadBrief();
+  } catch {
+    document.querySelectorAll('.editable-cell.dirty[data-edit-entity="employee"]').forEach((cell) => cell.classList.add("error"));
+  } finally {
+    setEmployeeSaveState();
+  }
+}
+
+async function deleteEmployee(employeeKey) {
+  const employee = employees[employeeKey] || archiveEmployees.find((item) => item.key === employeeKey);
+  if (!employeeKey || !employee) return;
+  if (!confirm(`确定删除员工「${employee.name}」吗？关联待办和沟通记录也会一起删除。`)) return;
+  try {
+    const result = await postJson("/api/employees/delete", { employeeKey });
+    selectedTodoId = "";
+    selectedFocusId = "";
+    if (result.archive) applyArchivePayload(result.archive);
+    await loadBrief();
+  } catch {
+    archiveEmployees = archiveEmployees.filter((item) => item.key !== employeeKey);
+    communicationRecords = communicationRecords.filter((record) => record.employeeKey !== employeeKey && record.employee !== employee.name);
+    smartTodos = smartTodos.filter((todo) => todo.employeeKey !== employeeKey);
+    syncEmployeesFromArchive(archiveEmployees);
+    renderArchive();
+  }
 }
 
 async function saveCommunicationCell(recordId, field, value) {
@@ -856,13 +851,16 @@ function renderArchiveEmployees() {
   const table = document.querySelector("[data-employee-table]");
   if (!table) return;
   document.querySelector("[data-employee-count]").textContent = `${archiveEmployees.length} 人`;
-  table.innerHTML = `<div class="archive-row archive-row-head archive-employee-row"><span>姓名</span><span>工号</span><span>部门</span><span>职务</span><span>入职时间</span><span>直属主管</span><span>操作</span></div>${archiveEmployees.map((employee) => `<div class="archive-row archive-employee-row" data-row-key="${escapeHtml(employee.key)}"><span class="archive-person"><b>${escapeHtml(employee.name.slice(0, 1))}</b>${editableCell(employee.name, "employee", "name")}</span>${editableCell(employee.employeeId || "", "employee", "employeeId")}${editableCell(employee.department || "", "employee", "department")}${editableCell(employee.role || "", "employee", "role")}${editableCell(employee.hireDate || "", "employee", "hireDate")}${editableCell(employee.manager || "", "employee", "manager")}<button class="mini-action" type="button" data-analyze-employee="${escapeHtml(employee.key)}">${employee.analysisStatus === "已分析" ? "重新分析" : "AI分析"}</button></div>`).join("")}`;
+  table.innerHTML = `<div class="archive-row archive-row-head archive-employee-row"><span>姓名</span><span>工号</span><span>部门</span><span>岗位</span><span>职级</span><span>绩效</span><span>趋势</span><span>目标%</span><span>加班h</span><span>迟到</span><span>合同到期</span><span>转正</span><span>薪酬信号</span><span>操作</span></div>${archiveEmployees.map((employee) => `<div class="archive-row archive-employee-row" data-row-key="${escapeHtml(employee.key)}"><span class="archive-person">${editableCell(employee.name, "employee", "name")}</span>${editableCell(employee.employeeId || "", "employee", "employeeId")}${editableCell(employee.department || "", "employee", "department")}${editableCell(employee.role || "", "employee", "role")}${editableCell(employee.jobLevel || "", "employee", "jobLevel")}${editableCell(employee.performanceRating || "", "employee", "performanceRating")}${editableCell(employee.performanceTrend || "", "employee", "performanceTrend")}${editableCell(employee.goalCompletionRate || "", "employee", "goalCompletionRate")}${editableCell(employee.overtimeHours30d || "", "employee", "overtimeHours30d")}${editableCell(employee.lateCount30d || "", "employee", "lateCount30d")}${editableCell(employee.contractEndDate || "", "employee", "contractEndDate")}${editableCell(employee.probationEndDate || "", "employee", "probationEndDate")}${editableCell(employee.compensationSignal || "", "employee", "compensationSignal")}<span class="row-actions"><button class="mini-action" type="button" data-analyze-employee="${escapeHtml(employee.key)}">${employee.analysisStatus === "已分析" ? "重新分析" : employee.analysisStatus === "待模型精算" ? "精算" : "AI分析"}</button><button class="mini-action danger-action" type="button" data-delete-employee="${escapeHtml(employee.key)}"><i data-lucide="trash-2"></i><span>删除</span></button></span></div>`).join("")}`;
   table.querySelectorAll("[data-edit-entity]").forEach((cell) => {
     cell.dataset.rowKey = cell.closest("[data-row-key]")?.dataset.rowKey || "";
   });
   bindEditableCells(table);
   table.querySelectorAll("[data-analyze-employee]").forEach((button) => {
     button.addEventListener("click", () => analyzeEmployee(button.dataset.analyzeEmployee, button));
+  });
+  table.querySelectorAll("[data-delete-employee]").forEach((button) => {
+    button.addEventListener("click", () => deleteEmployee(button.dataset.deleteEmployee));
   });
 }
 
@@ -973,8 +971,22 @@ function normalizeEmployeeRecord(row) {
     employeeId: row.employeeId || row.工号 || row["员工编号"] || "",
     department: row.department || row.部门 || "",
     role: row.role || row.职务 || row.岗位 || row.职位 || "",
+    jobLevel: row.jobLevel || row.职级 || row["岗位职级"] || "",
     hireDate: row.hireDate || row.入职时间 || row["入职日期"] || "",
     manager: row.manager || row.直属主管 || row.主管 || "",
+    performanceRating: row.performanceRating || row.当前绩效 || row["绩效等级"] || "",
+    performanceTrend: row.performanceTrend || row.绩效趋势 || "",
+    goalCompletionRate: row.goalCompletionRate || row.目标完成率 || "",
+    overtimeHours30d: row.overtimeHours30d || row["30天加班小时"] || row.加班小时 || "",
+    lateCount30d: row.lateCount30d || row["30天迟到次数"] || row.迟到次数 || "",
+    leaveDays30d: row.leaveDays30d || row["30天请假天数"] || row.请假天数 || "",
+    contractEndDate: row.contractEndDate || row.合同到期 || row["合同到期日"] || "",
+    probationEndDate: row.probationEndDate || row.转正日期 || row["试用期结束日"] || "",
+    mentor: row.mentor || row.导师 || "",
+    growthSummary: row.growthSummary || row.成长摘要 || row.成长信息 || "",
+    awardsSummary: row.awardsSummary || row.奖励摘要 || row.获奖信息 || "",
+    keyEvents: row.keyEvents || row.关键事件 || "",
+    compensationSignal: row.compensationSignal || row.薪酬信号 || row.薪酬风险 || "",
     lifecycle: "待分析",
     level: "待分析"
   };
@@ -1028,8 +1040,21 @@ function activateArchive() {
       employeeId: form.get("employeeId"),
       department: form.get("department"),
       role: form.get("role"),
+      jobLevel: form.get("jobLevel"),
       hireDate: form.get("hireDate"),
       manager: form.get("manager"),
+      performanceRating: form.get("performanceRating"),
+      performanceTrend: form.get("performanceTrend"),
+      goalCompletionRate: form.get("goalCompletionRate"),
+      overtimeHours30d: form.get("overtimeHours30d"),
+      lateCount30d: form.get("lateCount30d"),
+      leaveDays30d: form.get("leaveDays30d"),
+      contractEndDate: form.get("contractEndDate"),
+      probationEndDate: form.get("probationEndDate"),
+      mentor: form.get("mentor"),
+      growthSummary: form.get("growthSummary"),
+      awardsSummary: form.get("awardsSummary"),
+      compensationSignal: form.get("compensationSignal"),
       lifecycle: "待分析",
       level: "待分析"
     };
@@ -1044,6 +1069,7 @@ function activateArchive() {
     try {
       const result = await postJson("/api/employees", { employee });
       event.currentTarget.reset();
+      closeEmployeeModal();
       if (result.archive) applyArchivePayload(result.archive);
       await loadArchive();
     } catch {
@@ -1090,6 +1116,11 @@ function activateArchive() {
     await handleEmployeeUpload(event.target.files[0]);
     event.target.value = "";
   });
+  document.querySelector("[data-open-employee-modal]")?.addEventListener("click", openEmployeeModal);
+  document.querySelector("[data-save-employee-edits]")?.addEventListener("click", savePendingEmployeeChanges);
+  document.querySelectorAll("[data-close-employee-modal]").forEach((button) => {
+    button.addEventListener("click", closeEmployeeModal);
+  });
 }
 
 function activateUi() {
@@ -1104,8 +1135,8 @@ function activateUi() {
   document.querySelector("[data-close-drawer]")?.addEventListener("click", closeEmployeeDrawer);
   document.querySelector("[data-drawer-backdrop]")?.addEventListener("click", closeEmployeeDrawer);
   document.querySelector("[data-drawer-outline]")?.addEventListener("click", () => {
-    const key = document.querySelector("[data-employee-drawer]").dataset.employee || "zhangsan";
-    generateOutlineInModal(key);
+    const key = document.querySelector("[data-employee-drawer]").dataset.employee || "";
+    if (key) generateOutlineInModal(key);
   });
   document.querySelector("[data-drawer-analyze]")?.addEventListener("click", () => {
     const key = document.querySelector("[data-employee-drawer]").dataset.employee || "";
@@ -1121,6 +1152,7 @@ function activateUi() {
     if (event.key === "Escape") {
       closeEmployeeDrawer();
       closeOutlineModal();
+      closeEmployeeModal();
     }
   });
 }
@@ -1131,6 +1163,6 @@ document.addEventListener("DOMContentLoaded", () => {
   activateArchive();
   activateChat();
   loadArchive();
-  renderBrief(fallbackBrief);
+  renderBrief(emptyBrief);
   loadBrief();
 });

@@ -133,7 +133,7 @@
             <div>
               <p class="eyebrow">Today Focus</p>
               <h2 data-brief-title>今日重点关注</h2>
-              <p data-brief-summary>团队整体稳定，当前重点关注 3 名员工。优先处理张三的绩效与压力沟通，并跟进王五转正、李四合同续签节点。</p>
+              <p data-brief-summary>正在读取数据库中的员工档案、沟通记录和待办。</p>
             </div>
             <div class="focus-actions">
               <button class="select-btn" type="button" data-refresh-risk-list><i data-lucide="refresh-cw"></i><span>刷新</span></button>
@@ -219,28 +219,56 @@
           </div>
 
           <section class="archive-tab-panel active" data-archive-panel="basic">
-            <article class="panel archive-form-card">
+            <article class="panel archive-form-card archive-toolbar-card">
               <div class="panel-title">
                 <div>
                   <p class="eyebrow">Basic Info</p>
                   <h2>员工基本信息</h2>
                 </div>
-                <label class="upload-btn compact">
-                  <i data-lucide="file-up"></i>
-                  <span>上传 Excel/CSV</span>
-                  <input type="file" accept=".xlsx,.xls,.csv" data-employee-upload />
-                </label>
+                <div class="archive-toolbar-actions">
+                  <button class="primary-btn" type="button" data-open-employee-modal><i data-lucide="plus"></i><span>新增员工</span></button>
+                  <button class="select-btn" type="button" data-save-employee-edits disabled><i data-lucide="save"></i><span>保存修改</span></button>
+                  <label class="upload-btn compact">
+                    <i data-lucide="file-up"></i>
+                    <span>上传 Excel/CSV</span>
+                    <input type="file" accept=".xlsx,.xls,.csv" data-employee-upload />
+                  </label>
+                </div>
               </div>
-              <form class="archive-form" data-employee-form>
+            </article>
+
+            <div class="form-modal" data-employee-modal aria-hidden="true">
+              <div class="modal-backdrop" data-close-employee-modal></div>
+              <form class="archive-form form-modal-panel" data-employee-form>
+                <div class="modal-head">
+                  <div>
+                    <p class="eyebrow">New Employee</p>
+                    <h2>新增员工</h2>
+                  </div>
+                  <button type="button" data-close-employee-modal aria-label="关闭新增员工"><i data-lucide="x"></i></button>
+                </div>
                 <label><span>姓名</span><input name="name" required placeholder="例如：赵六" /></label>
                 <label><span>工号</span><input name="employeeId" placeholder="例如：E2026012" /></label>
                 <label><span>部门</span><input name="department" placeholder="例如：研发部" /></label>
                 <label><span>职务</span><input name="role" required placeholder="例如：后端工程师 · P5" /></label>
+                <label><span>职级</span><input name="jobLevel" placeholder="例如：P5" /></label>
                 <label><span>入职时间</span><input name="hireDate" type="date" /></label>
                 <label><span>直属主管</span><input name="manager" placeholder="例如：姚老师" /></label>
+                <label><span>当前绩效</span><input name="performanceRating" placeholder="例如：B+" /></label>
+                <label><span>绩效趋势</span><input name="performanceTrend" placeholder="例如：明显下滑/稳定/上升" /></label>
+                <label><span>目标完成率</span><input name="goalCompletionRate" type="number" min="0" max="100" placeholder="例如：82" /></label>
+                <label><span>30天加班h</span><input name="overtimeHours30d" type="number" min="0" step="0.5" placeholder="例如：28" /></label>
+                <label><span>30天迟到</span><input name="lateCount30d" type="number" min="0" placeholder="例如：4" /></label>
+                <label><span>30天请假</span><input name="leaveDays30d" type="number" min="0" step="0.5" placeholder="例如：2" /></label>
+                <label><span>合同到期</span><input name="contractEndDate" type="date" /></label>
+                <label><span>转正日期</span><input name="probationEndDate" type="date" /></label>
+                <label><span>导师</span><input name="mentor" placeholder="例如：导师姓名" /></label>
+                <label><span>成长摘要</span><input name="growthSummary" placeholder="例如：停滞/正常/晋升受阻" /></label>
+                <label><span>奖励摘要</span><input name="awardsSummary" placeholder="例如：Q1优秀员工" /></label>
+                <label><span>薪酬信号</span><input name="compensationSignal" placeholder="例如：无/不满/外部机会" /></label>
                 <button class="primary-btn" type="submit"><i data-lucide="plus"></i><span>新增员工</span></button>
               </form>
-            </article>
+            </div>
 
             <article class="panel archive-table-card">
               <div class="section-head">
@@ -285,33 +313,33 @@
       <div class="drawer-head">
         <div>
           <p class="eyebrow">Employee 360</p>
-          <h2 data-drawer-name>张三</h2>
+          <h2 data-drawer-name>员工姓名</h2>
           <span data-drawer-role>产品运营 · P6</span>
         </div>
         <button type="button" data-close-drawer aria-label="关闭员工画像"><i data-lucide="x"></i></button>
       </div>
       <div class="drawer-score">
         <span>当前风险分</span>
-        <strong data-drawer-risk>86</strong>
+        <strong data-drawer-risk>--</strong>
         <small data-drawer-level>高风险</small>
       </div>
       <section class="drawer-section">
         <h3>AI 风险解释</h3>
-        <p data-drawer-reason>连续加班 5 天，绩效从 B+ 下滑到 C，30 天未进行 1 对 1 沟通。</p>
+        <p data-drawer-reason>请选择员工后查看规则扫描和模型分析结果。</p>
       </section>
       <section class="drawer-section">
         <h3>关键证据</h3>
         <div class="drawer-tags" data-drawer-evidence></div>
       </section>
       <section class="drawer-section drawer-grid">
-        <div><span>绩效信息</span><strong data-drawer-performance>B+ -> C</strong></div>
-        <div><span>考勤信息</span><strong data-drawer-attendance>加班 28h</strong></div>
-        <div><span>最近沟通</span><strong data-drawer-communication>30 天未沟通</strong></div>
+        <div><span>绩效信息</span><strong data-drawer-performance>待分析</strong></div>
+        <div><span>考勤信息</span><strong data-drawer-attendance>待分析</strong></div>
+        <div><span>最近沟通</span><strong data-drawer-communication>待分析</strong></div>
         <div><span>建议动作</span><strong data-drawer-action>安排 1 对 1</strong></div>
       </section>
       <section class="drawer-section">
         <h3>生命周期</h3>
-        <p><strong data-drawer-lifecycle-stage>成长期</strong>：<span data-drawer-lifecycle-detail>重点关注目标承接、能力成长和稳定沟通节奏。</span></p>
+        <p><strong data-drawer-lifecycle-stage>待分析</strong>：<span data-drawer-lifecycle-detail>补充入职时间后自动判断生命周期阶段。</span></p>
       </section>
       <section class="drawer-section">
         <h3>关联待办</h3>

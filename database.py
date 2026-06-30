@@ -3,8 +3,6 @@ import sqlite3
 from datetime import date
 from pathlib import Path
 
-from data import FALLBACK_PROFILES, FALLBACK_TODOS, TEAM_CONTEXT
-
 
 DB_PATH = Path(__file__).resolve().parent / "employee_agent.db"
 
@@ -25,8 +23,22 @@ def init_db():
                 employee_id TEXT,
                 department TEXT,
                 role TEXT,
+                job_level TEXT,
                 hire_date TEXT,
                 manager TEXT,
+                performance_rating TEXT DEFAULT '',
+                performance_trend TEXT DEFAULT '',
+                goal_completion_rate INTEGER DEFAULT 0,
+                overtime_hours_30d REAL DEFAULT 0,
+                late_count_30d INTEGER DEFAULT 0,
+                leave_days_30d REAL DEFAULT 0,
+                contract_end_date TEXT DEFAULT '',
+                probation_end_date TEXT DEFAULT '',
+                mentor TEXT DEFAULT '',
+                growth_summary TEXT DEFAULT '',
+                awards_summary TEXT DEFAULT '',
+                key_events TEXT DEFAULT '',
+                compensation_signal TEXT DEFAULT '',
                 risk INTEGER DEFAULT 0,
                 level TEXT DEFAULT '待分析',
                 reason TEXT DEFAULT '',
@@ -39,6 +51,10 @@ def init_db():
                 communication TEXT DEFAULT '待分析',
                 suggested_action TEXT DEFAULT '待分析',
                 analysis_status TEXT DEFAULT '待分析',
+                data_version INTEGER DEFAULT 0,
+                last_analyzed_at TEXT,
+                risk_factors_json TEXT DEFAULT '[]',
+                model_required INTEGER DEFAULT 0,
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
 
@@ -68,81 +84,39 @@ def init_db():
             );
             """
         )
-        if not db.execute("SELECT 1 FROM employees LIMIT 1").fetchone():
-            seed_defaults(db)
+        ensure_employee_columns(db)
 
 
-def seed_defaults(db):
-    for employee in TEAM_CONTEXT["employees"]:
-        profile = FALLBACK_PROFILES.get(employee["name"], {})
-        key = slugify_name(employee["name"])
-        lifecycle = employee.get("lifecycle", {})
-        db.execute(
-            """
-            INSERT INTO employees (
-                key, name, employee_id, department, role, hire_date, manager,
-                risk, level, reason, evidence_json, goal, lifecycle_stage,
-                lifecycle_detail, performance, attendance, communication,
-                suggested_action, analysis_status
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """,
-            (
-                key,
-                employee["name"],
-                default_employee_id(key),
-                default_department(employee["role"]),
-                employee["role"],
-                default_hire_date(employee["name"]),
-                "姚老师",
-                employee.get("risk", 0),
-                employee.get("level", "待分析"),
-                employee.get("reason", ""),
-                json.dumps(employee.get("evidence", []), ensure_ascii=False),
-                employee.get("recommended_action", ""),
-                lifecycle.get("stage", profile.get("lifecycleStage", "待分析")),
-                lifecycle.get("detail", profile.get("lifecycleDetail", "")),
-                profile.get("performance", "待分析"),
-                profile.get("attendance", "待分析"),
-                profile.get("communication", "待分析"),
-                profile.get("suggestedAction", employee.get("recommended_action", "待分析")),
-                "已分析",
-            ),
-        )
-
-    db.executemany(
-        """
-        INSERT INTO communication_records (employee_key, employee_name, date, type, summary, action)
-        VALUES (?, ?, ?, ?, ?, ?)
-        """,
-        [
-            ("zhangsan", "张三", "2026-06-29", "1 对 1", "近期连续加班，需确认压力来源和目标优先级。", "今天完成绩效与压力沟通"),
-            ("lisi", "李四", "2026-06-28", "合同续签", "合同 9 天后到期，需结合考勤和续签意愿评估。", "本周完成续签评估"),
-        ],
-    )
-
-    for item in FALLBACK_TODOS["items"]:
-        upsert_todo(db, item)
+def ensure_employee_columns(db):
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(employees)").fetchall()}
+    migrations = {
+        "job_level": "ALTER TABLE employees ADD COLUMN job_level TEXT DEFAULT ''",
+        "performance_rating": "ALTER TABLE employees ADD COLUMN performance_rating TEXT DEFAULT ''",
+        "performance_trend": "ALTER TABLE employees ADD COLUMN performance_trend TEXT DEFAULT ''",
+        "goal_completion_rate": "ALTER TABLE employees ADD COLUMN goal_completion_rate INTEGER DEFAULT 0",
+        "overtime_hours_30d": "ALTER TABLE employees ADD COLUMN overtime_hours_30d REAL DEFAULT 0",
+        "late_count_30d": "ALTER TABLE employees ADD COLUMN late_count_30d INTEGER DEFAULT 0",
+        "leave_days_30d": "ALTER TABLE employees ADD COLUMN leave_days_30d REAL DEFAULT 0",
+        "contract_end_date": "ALTER TABLE employees ADD COLUMN contract_end_date TEXT DEFAULT ''",
+        "probation_end_date": "ALTER TABLE employees ADD COLUMN probation_end_date TEXT DEFAULT ''",
+        "mentor": "ALTER TABLE employees ADD COLUMN mentor TEXT DEFAULT ''",
+        "growth_summary": "ALTER TABLE employees ADD COLUMN growth_summary TEXT DEFAULT ''",
+        "awards_summary": "ALTER TABLE employees ADD COLUMN awards_summary TEXT DEFAULT ''",
+        "key_events": "ALTER TABLE employees ADD COLUMN key_events TEXT DEFAULT ''",
+        "compensation_signal": "ALTER TABLE employees ADD COLUMN compensation_signal TEXT DEFAULT ''",
+        "data_version": "ALTER TABLE employees ADD COLUMN data_version INTEGER DEFAULT 0",
+        "last_analyzed_at": "ALTER TABLE employees ADD COLUMN last_analyzed_at TEXT",
+        "risk_factors_json": "ALTER TABLE employees ADD COLUMN risk_factors_json TEXT DEFAULT '[]'",
+        "model_required": "ALTER TABLE employees ADD COLUMN model_required INTEGER DEFAULT 0",
+    }
+    for column, sql in migrations.items():
+        if column not in columns:
+            db.execute(sql)
 
 
 def slugify_name(name):
     mapping = {"张三": "zhangsan", "李四": "lisi", "王五": "wangwu"}
     return mapping.get(name, str(name).strip().lower().replace(" ", "-") or f"employee-{date.today().isoformat()}")
-
-
-def default_employee_id(key):
-    return {"zhangsan": "E2024001", "lisi": "E2023018", "wangwu": "E2026007"}.get(key, "")
-
-
-def default_department(role):
-    if "工程师" in role:
-        return "研发部"
-    if "客户" in role:
-        return "客户成功部"
-    return "产品部"
-
-
-def default_hire_date(name):
-    return {"张三": "2025-08-12", "李四": "2023-05-20", "王五": "2026-03-28"}.get(name, "")
 
 
 def row_to_employee(row):
@@ -152,12 +126,27 @@ def row_to_employee(row):
         "employeeId": row["employee_id"] or "",
         "department": row["department"] or "",
         "role": row["role"] or "",
+        "jobLevel": row["job_level"] or "",
         "hireDate": row["hire_date"] or "",
         "manager": row["manager"] or "",
+        "performanceRating": row["performance_rating"] or "",
+        "performanceTrend": row["performance_trend"] or "",
+        "goalCompletionRate": row["goal_completion_rate"] or 0,
+        "overtimeHours30d": row["overtime_hours_30d"] or 0,
+        "lateCount30d": row["late_count_30d"] or 0,
+        "leaveDays30d": row["leave_days_30d"] or 0,
+        "contractEndDate": row["contract_end_date"] or "",
+        "probationEndDate": row["probation_end_date"] or "",
+        "mentor": row["mentor"] or "",
+        "growthSummary": row["growth_summary"] or "",
+        "awardsSummary": row["awards_summary"] or "",
+        "keyEvents": row["key_events"] or "",
+        "compensationSignal": row["compensation_signal"] or "",
         "risk": row["risk"] or 0,
         "level": row["level"] or "待分析",
         "reason": row["reason"] or "",
         "evidence": json.loads(row["evidence_json"] or "[]"),
+        "riskFactors": json.loads(row["risk_factors_json"] or "[]"),
         "goal": row["goal"] or "",
         "lifecycle": {
             "stage": row["lifecycle_stage"] or "待分析",
@@ -168,6 +157,9 @@ def row_to_employee(row):
         "communication": row["communication"] or "待分析",
         "suggestedAction": row["suggested_action"] or "待分析",
         "analysisStatus": row["analysis_status"] or "待分析",
+        "dataVersion": row["data_version"] or 0,
+        "lastAnalyzedAt": row["last_analyzed_at"] or "",
+        "modelRequired": bool(row["model_required"]),
     }
 
 
@@ -215,8 +207,30 @@ def get_employee_by_name(name):
         return row_to_employee(row) if row else None
 
 
+def get_employee_by_id(employee_id):
+    if not employee_id:
+        return None
+    with connect() as db:
+        row = db.execute("SELECT * FROM employees WHERE employee_id = ?", (employee_id,)).fetchone()
+        return row_to_employee(row) if row else None
+
+
+def delete_employee(employee_key):
+    with connect() as db:
+        row = db.execute("SELECT * FROM employees WHERE key = ?", (employee_key,)).fetchone()
+        if not row:
+            return None
+        employee = row_to_employee(row)
+        db.execute("DELETE FROM todos WHERE employee_key = ?", (employee_key,))
+        db.execute("DELETE FROM communication_records WHERE employee_key = ?", (employee_key,))
+        db.execute("DELETE FROM employees WHERE key = ?", (employee_key,))
+        return employee
+
+
 def upsert_employee(employee):
-    key = employee.get("key") or slugify_name(employee.get("name", ""))
+    employee_id = employee.get("employeeId", "")
+    existing = None if employee.get("key") else get_employee_by_id(employee_id)
+    key = employee.get("key") or (existing["key"] if existing else slugify_name(employee.get("name", "")))
     lifecycle = employee.get("lifecycle") or {}
     if isinstance(lifecycle, str):
         lifecycle = {"stage": lifecycle, "detail": employee.get("lifecycleDetail", "")}
@@ -224,18 +238,39 @@ def upsert_employee(employee):
         db.execute(
             """
             INSERT INTO employees (
-                key, name, employee_id, department, role, hire_date, manager,
+                key, name, employee_id, department, role, job_level, hire_date, manager,
+                performance_rating, performance_trend, goal_completion_rate,
+                overtime_hours_30d, late_count_30d, leave_days_30d,
+                contract_end_date, probation_end_date, mentor, growth_summary,
+                awards_summary, key_events, compensation_signal,
                 risk, level, reason, evidence_json, goal, lifecycle_stage,
                 lifecycle_detail, performance, attendance, communication,
-                suggested_action, analysis_status, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                suggested_action, analysis_status, data_version, model_required, updated_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(key) DO UPDATE SET
                 name=excluded.name,
                 employee_id=excluded.employee_id,
                 department=excluded.department,
                 role=excluded.role,
+                job_level=excluded.job_level,
                 hire_date=excluded.hire_date,
                 manager=excluded.manager,
+                performance_rating=excluded.performance_rating,
+                performance_trend=excluded.performance_trend,
+                goal_completion_rate=excluded.goal_completion_rate,
+                overtime_hours_30d=excluded.overtime_hours_30d,
+                late_count_30d=excluded.late_count_30d,
+                leave_days_30d=excluded.leave_days_30d,
+                contract_end_date=excluded.contract_end_date,
+                probation_end_date=excluded.probation_end_date,
+                mentor=excluded.mentor,
+                growth_summary=excluded.growth_summary,
+                awards_summary=excluded.awards_summary,
+                key_events=excluded.key_events,
+                compensation_signal=excluded.compensation_signal,
+                analysis_status='待分析',
+                data_version=employees.data_version + 1,
+                model_required=1,
                 updated_at=CURRENT_TIMESTAMP
             """,
             (
@@ -244,8 +279,22 @@ def upsert_employee(employee):
                 employee.get("employeeId", ""),
                 employee.get("department", ""),
                 employee.get("role", ""),
+                employee.get("jobLevel", ""),
                 employee.get("hireDate", ""),
                 employee.get("manager", ""),
+                employee.get("performanceRating", ""),
+                employee.get("performanceTrend", ""),
+                int(employee.get("goalCompletionRate") or 0),
+                float(employee.get("overtimeHours30d") or 0),
+                int(employee.get("lateCount30d") or 0),
+                float(employee.get("leaveDays30d") or 0),
+                employee.get("contractEndDate", ""),
+                employee.get("probationEndDate", ""),
+                employee.get("mentor", ""),
+                employee.get("growthSummary", ""),
+                employee.get("awardsSummary", ""),
+                employee.get("keyEvents", ""),
+                employee.get("compensationSignal", ""),
                 employee.get("risk", 0),
                 employee.get("level", "待分析"),
                 employee.get("reason", ""),
@@ -258,9 +307,54 @@ def upsert_employee(employee):
                 employee.get("communication", "待分析"),
                 employee.get("suggestedAction", "待分析"),
                 employee.get("analysisStatus", "待分析"),
+                int(employee.get("dataVersion") or 0),
+                int(bool(employee.get("modelRequired", True))),
             ),
         )
     return get_employee(key)
+
+
+def save_rule_analysis(employee_key, profile, model_required=True):
+    with connect() as db:
+        db.execute(
+            """
+            UPDATE employees SET
+                risk = ?,
+                level = ?,
+                reason = ?,
+                evidence_json = ?,
+                goal = ?,
+                lifecycle_stage = ?,
+                lifecycle_detail = ?,
+                performance = ?,
+                attendance = ?,
+                communication = ?,
+                suggested_action = ?,
+                analysis_status = ?,
+                risk_factors_json = ?,
+                model_required = ?,
+                updated_at = CURRENT_TIMESTAMP
+            WHERE key = ?
+            """,
+            (
+                profile.get("risk", 0),
+                profile.get("level", "正常"),
+                profile.get("riskSummary", ""),
+                json.dumps(profile.get("evidence", []), ensure_ascii=False),
+                profile.get("suggestedAction", ""),
+                profile.get("lifecycleStage", "待分析"),
+                profile.get("lifecycleDetail", ""),
+                profile.get("performance", "待分析"),
+                profile.get("attendance", "待分析"),
+                profile.get("communication", "待分析"),
+                profile.get("suggestedAction", "待分析"),
+                "待模型精算" if model_required else "规则已分析",
+                json.dumps(profile.get("riskFactors", []), ensure_ascii=False),
+                int(bool(model_required)),
+                employee_key,
+            ),
+        )
+    return get_employee(employee_key)
 
 
 def save_analysis(employee_key, profile):
@@ -280,6 +374,8 @@ def save_analysis(employee_key, profile):
                 communication = ?,
                 suggested_action = ?,
                 analysis_status = '已分析',
+                last_analyzed_at = CURRENT_TIMESTAMP,
+                model_required = 0,
                 updated_at = CURRENT_TIMESTAMP
             WHERE key = ?
             """,
@@ -394,6 +490,16 @@ def get_todo(todo_id):
     with connect() as db:
         row = db.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
         return row_to_todo(row) if row else None
+
+
+def delete_todo(todo_id):
+    with connect() as db:
+        row = db.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
+        if not row:
+            return None
+        todo = row_to_todo(row)
+        db.execute("DELETE FROM todos WHERE id = ?", (todo_id,))
+        return todo
 
 
 def upsert_todo(db, item):

@@ -25,6 +25,8 @@ from agent_services import (
     get_archive,
     get_metrics,
     import_employees,
+    remove_employee,
+    remove_todo,
     save_communication,
     save_employee,
     update_communication,
@@ -71,6 +73,14 @@ def employees_import(payload: Payload):
     return import_employees(payload.employees or [])
 
 
+@app.post("/api/employees/delete")
+def employees_delete(payload: Payload):
+    try:
+        return remove_employee(payload.employeeKey or "")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
 @app.post("/api/communication")
 def communication(payload: Payload):
     return save_communication(payload.record or {})
@@ -110,6 +120,14 @@ def todos_status(payload: Payload):
         return update_todo_status(payload.todoId or "", payload.status or "")
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/todos/delete")
+def todos_delete(payload: Payload):
+    try:
+        return remove_todo(payload.todoId or "")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/api/profile")
