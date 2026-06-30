@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>员工管理助手</title>
-    <link rel="stylesheet" href="./styles.css?v=41" />
+    <link rel="stylesheet" href="./styles.css?v=43" />
     <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script defer src="./app.js?v=41"></script>
+    <script defer src="./app.js?v=43"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -64,13 +64,7 @@
               <button class="select-btn small" type="button">This week <i data-lucide="chevron-down"></i></button>
             </div>
 
-            <div class="signal-board">
-              <div class="signal-hero">
-                <span>整体健康度</span>
-                <strong data-signal-health>75%</strong>
-                <small>基于风险、沟通覆盖、关键节点综合判断</small>
-              </div>
-
+            <div class="signal-board compact">
               <div class="signal-rings" aria-hidden="true">
                 <span class="ring ring-one"></span>
                 <span class="ring ring-two"></span>
@@ -96,21 +90,10 @@
                   <em><b data-signal-action-bar></b></em>
                   <strong data-funnel-action>7</strong>
                 </div>
-                <div>
-                  <span>沟通覆盖</span>
-                  <em><b data-signal-coverage-bar></b></em>
-                  <strong data-signal-coverage>76%</strong>
-                </div>
-              </div>
-
-              <div class="signal-summary">
-                <div><span>团队人数</span><strong data-funnel-total>12</strong></div>
-                <div><span>关注占比</span><strong data-signal-focus-rate>25%</strong></div>
-                <div><span>本周节点</span><strong>2</strong></div>
               </div>
             </div>
 
-            <div class="kpi-strip" data-metrics>
+            <div class="kpi-strip compact" data-metrics>
               <article class="kpi loading"><strong>--</strong><span>读取中</span></article>
             </div>
           </section>

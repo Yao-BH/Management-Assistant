@@ -251,10 +251,15 @@ async function loadArchive() {
 
 function renderMetrics(items) {
   const grid = document.querySelector("[data-metrics]");
-  if (!grid) return;
+  if (!grid) {
+    renderSignalBoard(Array.isArray(items) && items.length ? items : deriveDashboardMetrics());
+    return;
+  }
   grid.innerHTML = "";
   const source = Array.isArray(items) && items.length ? items : deriveDashboardMetrics();
-  const normalized = source.slice(0, 4).map((item, index) => ({
+  const dashboardKeys = ["team", "focus", "todo"];
+  const visibleSource = dashboardKeys.map((key) => source.find((item) => item.key === key) || fallbackMetrics.find((item) => item.key === key)).filter(Boolean);
+  const normalized = visibleSource.map((item, index) => ({
     key: item.key || fallbackMetrics[index].key,
     label: item.label || fallbackMetrics[index].label,
     value: item.value || fallbackMetrics[index].value,
@@ -311,17 +316,25 @@ function renderSignalBoard(items = fallbackMetrics) {
   const coverageNumber = Number.parseInt(coverage, 10) || 76;
   const todoNumber = Number.parseInt(todo, 10) || 7;
   const health = Math.max(0, Math.min(100, Math.round(stableRate * 0.55 + coverageNumber * 0.35 - todoNumber * 1.2)));
-  document.querySelector("[data-funnel-total]").textContent = team;
-  document.querySelector("[data-funnel-stable]").textContent = String(stableNumber);
-  document.querySelector("[data-funnel-focus]").textContent = focus;
-  document.querySelector("[data-funnel-action]").textContent = todo;
-  document.querySelector("[data-signal-health]").textContent = `${health}%`;
-  document.querySelector("[data-signal-coverage]").textContent = coverage;
-  document.querySelector("[data-signal-focus-rate]").textContent = `${focusRate}%`;
-  document.querySelector("[data-signal-stable-bar]").style.width = `${stableRate}%`;
-  document.querySelector("[data-signal-focus-bar]").style.width = `${focusRate}%`;
-  document.querySelector("[data-signal-action-bar]").style.width = `${Math.min(todoNumber * 12, 100)}%`;
-  document.querySelector("[data-signal-coverage-bar]").style.width = `${coverageNumber}%`;
+  const setText = (selector, value) => {
+    const node = document.querySelector(selector);
+    if (node) node.textContent = value;
+  };
+  const setWidth = (selector, value) => {
+    const node = document.querySelector(selector);
+    if (node) node.style.width = value;
+  };
+  setText("[data-funnel-total]", team);
+  setText("[data-funnel-stable]", String(stableNumber));
+  setText("[data-funnel-focus]", focus);
+  setText("[data-funnel-action]", todo);
+  setText("[data-signal-health]", `${health}%`);
+  setText("[data-signal-coverage]", coverage);
+  setText("[data-signal-focus-rate]", `${focusRate}%`);
+  setWidth("[data-signal-stable-bar]", `${stableRate}%`);
+  setWidth("[data-signal-focus-bar]", `${focusRate}%`);
+  setWidth("[data-signal-action-bar]", `${Math.min(todoNumber * 12, 100)}%`);
+  setWidth("[data-signal-coverage-bar]", `${coverageNumber}%`);
 }
 
 async function loadMetrics() {
