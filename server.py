@@ -27,6 +27,7 @@ from agent_services import (
     import_employees,
     save_communication,
     save_employee,
+    update_communication,
     update_todo_status,
 )
 
@@ -40,6 +41,7 @@ class Payload(BaseModel):
     history: list[dict[str, Any]] | None = None
     intent: str | None = None
     todoId: str | None = None
+    recordId: int | str | None = None
     status: str | None = None
 
 
@@ -72,6 +74,14 @@ def employees_import(payload: Payload):
 @app.post("/api/communication")
 def communication(payload: Payload):
     return save_communication(payload.record or {})
+
+
+@app.post("/api/communication/update")
+def communication_update(payload: Payload):
+    try:
+        return update_communication(payload.recordId or "", payload.record or {})
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.post("/api/communication/complete")

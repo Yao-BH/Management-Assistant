@@ -690,18 +690,89 @@ function showView(viewName) {
     view.hidden = !active;
     view.classList.toggle("active", active);
   });
+  if (viewName === "todo-workbench") renderTodoWorkbench();
+}
+
+function setArchiveTab(tabName) {
+  document.querySelectorAll("[data-archive-tab]").forEach((button) => {
+    const active = button.dataset.archiveTab === tabName;
+    button.classList.toggle("active", active);
+  });
+  document.querySelectorAll("[data-archive-panel]").forEach((panel) => {
+    const active = panel.dataset.archivePanel === tabName;
+    panel.hidden = !active;
+    panel.classList.toggle("active", active);
+  });
+}
+
+function editableCell(value, entity, key, multiline = false) {
+  return `<span class="editable-cell ${multiline ? "multiline" : ""}" contenteditable="true" spellcheck="false" data-edit-entity="${entity}" data-edit-key="${key}">${escapeHtml(value || "")}</span>`;
+}
+
+function bindEditableCells(scope) {
+  scope.querySelectorAll("[data-edit-entity]").forEach((cell) => {
+    cell.dataset.originalValue = cell.textContent.trim();
+    cell.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" && !event.shiftKey) {
+        event.preventDefault();
+        cell.blur();
+      }
+      if (event.key === "Escape") {
+        cell.textContent = cell.dataset.originalValue || "";
+        cell.blur();
+      }
+    });
+    cell.addEventListener("blur", () => saveEditableCell(cell));
+  });
+}
+
+async function saveEditableCell(cell) {
+  const value = cell.textContent.trim();
+  if (value === (cell.dataset.originalValue || "")) return;
+  cell.classList.add("saving");
+  try {
+    if (cell.dataset.editEntity === "employee") {
+      await saveEmployeeCell(cell.dataset.rowKey, cell.dataset.editKey, value);
+    } else {
+      await saveCommunicationCell(cell.dataset.rowKey, cell.dataset.editKey, value);
+    }
+    cell.dataset.originalValue = value;
+    cell.classList.remove("error");
+  } catch {
+    cell.classList.add("error");
+  } finally {
+    cell.classList.remove("saving");
+  }
+}
+
+async function saveEmployeeCell(employeeKey, field, value) {
+  const current = archiveEmployees.find((employee) => employee.key === employeeKey);
+  if (!current) return;
+  const updated = { ...current, [field]: value };
+  archiveEmployees = archiveEmployees.map((employee) => employee.key === employeeKey ? updated : employee);
+  syncEmployeesFromArchive(archiveEmployees);
+  const result = await postJson("/api/employees", { employee: updated });
+  if (result.archive) applyArchivePayload(result.archive);
+}
+
+async function saveCommunicationCell(recordId, field, value) {
+  const current = communicationRecords.find((record) => String(record.id) === String(recordId));
+  if (!current) return;
+  const updated = { ...current, [field]: value };
+  communicationRecords = communicationRecords.map((record) => String(record.id) === String(recordId) ? updated : record);
+  const result = await postJson("/api/communication/update", { recordId, record: updated });
+  if (result.archive) applyArchivePayload(result.archive);
 }
 
 function renderArchiveEmployees() {
   const table = document.querySelector("[data-employee-table]");
   if (!table) return;
   document.querySelector("[data-employee-count]").textContent = `${archiveEmployees.length} 人`;
-  table.innerHTML = `<div class="archive-row archive-row-head archive-employee-row"><span>姓名</span><span>工号</span><span>部门</span><span>职务</span><span>入职时间</span><span>系统分析</span><span>操作</span></div>${archiveEmployees.map((employee) => `<div class="archive-row archive-employee-row"><button class="archive-person" type="button" data-archive-employee="${escapeHtml(employee.key)}"><b>${escapeHtml(employee.name.slice(0, 1))}</b>${escapeHtml(employee.name)}</button><span>${escapeHtml(employee.employeeId || "-")}</span><span>${escapeHtml(employee.department || "-")}</span><span>${escapeHtml(employee.role || "-")}</span><span>${escapeHtml(employee.hireDate || "-")}</span><span class="status-pill ${employee.level === "高风险" ? "high" : employee.level === "中风险" ? "medium" : "low"}">${escapeHtml(employee.lifecycle?.stage || employee.lifecycle || "待分析")} · ${escapeHtml(employee.level || "待分析")}</span><button class="mini-action" type="button" data-analyze-employee="${escapeHtml(employee.key)}">${employee.analysisStatus === "已分析" ? "重新分析" : "AI分析"}</button></div>`).join("")}`;
-  table.querySelectorAll("[data-archive-employee]").forEach((row) => {
-    row.addEventListener("click", () => {
-      if (employees[row.dataset.archiveEmployee]) openEmployeeDrawer(row.dataset.archiveEmployee);
-    });
+  table.innerHTML = `<div class="archive-row archive-row-head archive-employee-row"><span>姓名</span><span>工号</span><span>部门</span><span>职务</span><span>入职时间</span><span>直属主管</span><span>操作</span></div>${archiveEmployees.map((employee) => `<div class="archive-row archive-employee-row" data-row-key="${escapeHtml(employee.key)}"><span class="archive-person"><b>${escapeHtml(employee.name.slice(0, 1))}</b>${editableCell(employee.name, "employee", "name")}</span>${editableCell(employee.employeeId || "", "employee", "employeeId")}${editableCell(employee.department || "", "employee", "department")}${editableCell(employee.role || "", "employee", "role")}${editableCell(employee.hireDate || "", "employee", "hireDate")}${editableCell(employee.manager || "", "employee", "manager")}<button class="mini-action" type="button" data-analyze-employee="${escapeHtml(employee.key)}">${employee.analysisStatus === "已分析" ? "重新分析" : "AI分析"}</button></div>`).join("")}`;
+  table.querySelectorAll("[data-edit-entity]").forEach((cell) => {
+    cell.dataset.rowKey = cell.closest("[data-row-key]")?.dataset.rowKey || "";
   });
+  bindEditableCells(table);
   table.querySelectorAll("[data-analyze-employee]").forEach((button) => {
     button.addEventListener("click", () => analyzeEmployee(button.dataset.analyzeEmployee, button));
   });
@@ -711,13 +782,17 @@ function renderCommunicationRecords() {
   const table = document.querySelector("[data-communication-table]");
   if (!table) return;
   document.querySelector("[data-communication-count]").textContent = `${communicationRecords.length} 条`;
-  table.innerHTML = `<div class="archive-row archive-row-head communication"><span>员工</span><span>日期</span><span>类型</span><span>摘要</span><span>动作</span></div>${communicationRecords.map((record) => `<div class="archive-row communication"><span>${escapeHtml(record.employee || "-")}</span><span>${escapeHtml(record.date || "-")}</span><span>${escapeHtml(record.type || "-")}</span><span>${escapeHtml(record.summary || "-")}</span><span>${escapeHtml(record.action || "-")}</span></div>`).join("")}`;
+  table.innerHTML = `<div class="archive-row archive-row-head communication"><span>员工</span><span>日期</span><span>沟通摘要</span></div>${communicationRecords.map((record) => `<div class="archive-row communication" data-row-key="${escapeHtml(record.id)}">${editableCell(record.employee || "", "communication", "employee")}${editableCell(record.date || "", "communication", "date")}${editableCell(record.summary || "", "communication", "summary", true)}</div>`).join("")}`;
+  table.querySelectorAll("[data-edit-entity]").forEach((cell) => {
+    cell.dataset.rowKey = cell.closest("[data-row-key]")?.dataset.rowKey || "";
+  });
+  bindEditableCells(table);
 }
 
 function updateCommunicationEmployeeOptions() {
-  const select = document.querySelector("[data-communication-employee]");
-  if (!select) return;
-  select.innerHTML = archiveEmployees.map((employee) => `<option value="${escapeHtml(employee.name)}">${escapeHtml(employee.name)}</option>`).join("");
+  const options = document.querySelector("[data-employee-name-options]");
+  if (!options) return;
+  options.innerHTML = archiveEmployees.map((employee) => `<option value="${escapeHtml(employee.name)}"></option>`).join("");
 }
 
 function renderArchive() {
@@ -851,6 +926,9 @@ async function handleEmployeeUpload(file) {
 }
 
 function activateArchive() {
+  document.querySelectorAll("[data-archive-tab]").forEach((button) => {
+    button.addEventListener("click", () => setArchiveTab(button.dataset.archiveTab));
+  });
   document.querySelector("[data-employee-form]")?.addEventListener("submit", async (event) => {
     event.preventDefault();
     const submitButton = event.currentTarget.querySelector("button[type='submit']");
@@ -893,7 +971,13 @@ function activateArchive() {
     event.preventDefault();
     const submitButton = event.currentTarget.querySelector("button[type='submit']");
     const form = new FormData(event.currentTarget);
-    const record = { employee: form.get("employee"), date: form.get("date") || new Date().toISOString().slice(0, 10), type: form.get("type"), summary: form.get("summary"), action: form.get("action") };
+    const record = {
+      employee: form.get("employee"),
+      date: form.get("date") || new Date().toISOString().slice(0, 10),
+      type: "",
+      summary: form.get("summary"),
+      action: ""
+    };
     if (submitButton) {
       submitButton.disabled = true;
       submitButton.querySelector("span").textContent = "记录中";

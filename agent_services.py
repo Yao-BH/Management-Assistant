@@ -60,6 +60,13 @@ def save_communication(record):
     return {"record": saved, "archive": get_archive()}
 
 
+def update_communication(record_id, updates):
+    saved = database.update_communication_record(record_id, updates)
+    if not saved:
+        raise ValueError("Communication record not found")
+    return {"record": saved, "archive": get_archive()}
+
+
 def complete_communication_workflow(record, todo_id=None):
     saved = database.add_communication_record(record)
     employee_key = saved.get("employeeKey") or record.get("employeeKey", "")

@@ -332,6 +332,44 @@ def add_communication_record(record):
         return row_to_record(row)
 
 
+def update_communication_record(record_id, updates):
+    current_records = list_communication_records()
+    current = next((record for record in current_records if str(record["id"]) == str(record_id)), None)
+    if not current:
+        return None
+
+    employee_name = updates.get("employee", current["employee"])
+    employee_key = updates.get("employeeKey", current["employeeKey"])
+    if employee_name and (not employee_key or employee_name != current["employee"]):
+        employee = get_employee_by_name(employee_name)
+        employee_key = employee["key"] if employee else employee_key
+
+    with connect() as db:
+        db.execute(
+            """
+            UPDATE communication_records SET
+                employee_key = ?,
+                employee_name = ?,
+                date = ?,
+                type = ?,
+                summary = ?,
+                action = ?
+            WHERE id = ?
+            """,
+            (
+                employee_key or "",
+                employee_name or "",
+                updates.get("date", current["date"]),
+                updates.get("type", current["type"]),
+                updates.get("summary", current["summary"]),
+                updates.get("action", current["action"]),
+                record_id,
+            ),
+        )
+        row = db.execute("SELECT * FROM communication_records WHERE id = ?", (record_id,)).fetchone()
+        return row_to_record(row)
+
+
 def list_todos():
     with connect() as db:
         rows = db.execute(

@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>员工管理助手</title>
-    <link rel="stylesheet" href="./styles.css?v=36" />
+    <link rel="stylesheet" href="./styles.css?v=40" />
     <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script defer src="./app.js?v=36"></script>
+    <script defer src="./app.js?v=40"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -221,20 +221,24 @@
               <h2>员工档案</h2>
               <p>统一维护员工基本信息和沟通状况，为风险研判、智能待办和管理助手提供基础数据。</p>
             </div>
-            <label class="upload-btn">
-              <i data-lucide="file-up"></i>
-              <span>上传 Excel/CSV</span>
-              <input type="file" accept=".xlsx,.xls,.csv" data-employee-upload />
-            </label>
+            <div class="archive-tabs" role="tablist" aria-label="员工档案切换">
+              <button class="active" type="button" data-archive-tab="basic"><i data-lucide="id-card"></i><span>基本信息</span></button>
+              <button type="button" data-archive-tab="communication"><i data-lucide="messages-square"></i><span>沟通状况</span></button>
+            </div>
           </div>
 
-          <section class="archive-grid">
+          <section class="archive-tab-panel active" data-archive-panel="basic">
             <article class="panel archive-form-card">
               <div class="panel-title">
                 <div>
                   <p class="eyebrow">Basic Info</p>
                   <h2>员工基本信息</h2>
                 </div>
+                <label class="upload-btn compact">
+                  <i data-lucide="file-up"></i>
+                  <span>上传 Excel/CSV</span>
+                  <input type="file" accept=".xlsx,.xls,.csv" data-employee-upload />
+                </label>
               </div>
               <form class="archive-form" data-employee-form>
                 <label><span>姓名</span><input name="name" required placeholder="例如：赵六" /></label>
@@ -247,6 +251,16 @@
               </form>
             </article>
 
+            <article class="panel archive-table-card">
+              <div class="section-head">
+                <h2>全体基本信息</h2>
+                <small data-employee-count>0 人</small>
+              </div>
+              <div class="archive-table" data-employee-table></div>
+            </article>
+          </section>
+
+          <section class="archive-tab-panel" data-archive-panel="communication" hidden>
             <article class="panel archive-form-card">
               <div class="panel-title">
                 <div>
@@ -255,28 +269,17 @@
                 </div>
               </div>
               <form class="archive-form" data-communication-form>
-                <label><span>员工</span><select name="employee" data-communication-employee></select></label>
+                <label><span>员工姓名</span><input name="employee" list="employee-name-options" data-communication-employee required placeholder="输入姓名，支持下拉提醒" /></label>
+                <datalist id="employee-name-options" data-employee-name-options></datalist>
                 <label><span>沟通日期</span><input name="date" type="date" /></label>
-                <label><span>沟通类型</span><select name="type"><option>1 对 1</option><option>转正面谈</option><option>绩效沟通</option><option>合同续签</option></select></label>
                 <label class="wide"><span>沟通摘要</span><textarea name="summary" rows="3" placeholder="记录本次沟通重点、员工状态和阻塞点"></textarea></label>
-                <label class="wide"><span>后续动作</span><input name="action" placeholder="例如：两周后复盘目标进展" /></label>
                 <button class="primary-btn" type="submit"><i data-lucide="message-square-plus"></i><span>记录沟通</span></button>
               </form>
             </article>
-          </section>
-
-          <section class="archive-grid tables">
-            <article class="panel archive-table-card">
-              <div class="section-head">
-                <h2>员工基本信息库</h2>
-                <small data-employee-count>0 人</small>
-              </div>
-              <div class="archive-table" data-employee-table></div>
-            </article>
 
             <article class="panel archive-table-card">
               <div class="section-head">
-                <h2>沟通记录</h2>
+                <h2>全体沟通记录</h2>
                 <small data-communication-count>0 条</small>
               </div>
               <div class="archive-table" data-communication-table></div>
