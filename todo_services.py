@@ -35,6 +35,30 @@ def local_todos(context):
     return items
 
 
+def should_have_focus_todo(employee):
+    return employee["level"] in ("高风险", "中风险") or employee.get("risk", 0) >= 40 or employee.get("modelRequired")
+
+
+def todo_from_employee(employee):
+    evidence = employee.get("evidence") or employee.get("riskFactors") or []
+    return {
+        "id": f"system-{employee['key']}",
+        "employeeKey": employee["key"],
+        "priority": "P1" if employee["level"] == "高风险" else "P2" if employee["level"] == "中风险" else "P3",
+        "title": employee.get("suggestedAction") if employee.get("suggestedAction") != "待分析" else f"跟进{employee['name']}员工状态",
+        "badge": employee["level"],
+        "summary": employee.get("reason") or "规则扫描发现该员工需要关注。",
+        "tags": evidence[:4] or [employee.get("department", ""), employee.get("analysisStatus", "")],
+        "level": level_to_todo_level(employee["level"]),
+    }
+
+
+def sync_employee_todo(employee):
+    if should_have_focus_todo(employee):
+        return database.sync_employee_system_todo(employee["key"], todo_from_employee(employee))
+    return database.sync_employee_system_todo(employee["key"], None)
+
+
 def generate_todos():
     context = build_team_context()
     try:

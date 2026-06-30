@@ -5,7 +5,14 @@ def build_team_context():
     employees = database.list_employees()
     records = database.list_communication_records()
     todos = database.list_todos()
-    focus = [employee for employee in employees if employee["level"] in ("高风险", "中风险")]
+    focus = [
+        employee
+        for employee in employees
+        if employee["level"] in ("高风险", "中风险")
+        or employee.get("risk", 0) >= 40
+        or employee.get("modelRequired")
+        or employee.get("analysisStatus") in ("待模型精算", "待分析")
+    ]
     covered_names = {record["employee"] for record in records if record.get("employee")}
     coverage = round((len(covered_names) / len(employees)) * 100) if employees else 0
 
@@ -29,6 +36,7 @@ def build_focus_context():
         employee
         for employee in employees
         if employee["level"] in ("高风险", "中风险")
+        or employee.get("risk", 0) >= 40
         or employee.get("modelRequired")
         or employee.get("analysisStatus") in ("待模型精算", "待分析")
     ]
@@ -42,9 +50,9 @@ def build_focus_context():
     todos = [todo for todo in context["todos"] if not todo.get("employeeKey") or todo["employeeKey"] in focus_keys]
     return {
         "summary": context["summary"],
-        "focus_employees": focus[:10],
-        "related_communication_records": records[:12],
-        "related_todos": todos[:10],
+        "focus_employees": focus,
+        "related_communication_records": records,
+        "related_todos": todos,
     }
 
 

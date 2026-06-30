@@ -502,6 +502,33 @@ def delete_todo(todo_id):
         return todo
 
 
+def sync_employee_system_todo(employee_key, item=None):
+    with connect() as db:
+        current = db.execute(
+            """
+            SELECT * FROM todos
+            WHERE employee_key = ? AND source IN ('system', 'ai')
+            ORDER BY created_at DESC
+            LIMIT 1
+            """,
+            (employee_key,),
+        ).fetchone()
+        preserved_status = current["status"] if current else "待处理"
+        db.execute("DELETE FROM todos WHERE employee_key = ? AND source IN ('system', 'ai')", (employee_key,))
+        if item:
+            upsert_todo(
+                db,
+                {
+                    **item,
+                    "id": item.get("id") or f"system-{employee_key}",
+                    "employeeKey": employee_key,
+                    "status": item.get("status") or preserved_status,
+                    "source": "system",
+                },
+            )
+    return list_todos()
+
+
 def upsert_todo(db, item):
     db.execute(
         """

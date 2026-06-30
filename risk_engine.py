@@ -132,6 +132,7 @@ def rule_profile(employee, records=None):
     level = infer_level(risk)
     if risk < 40:
         level = "正常"
+    action = "优先安排 1 对 1 沟通并形成跟进行动" if level in ("高风险", "中风险") else "安排一次状态确认并补充关键节点信息" if risk >= 40 else "保持常规沟通节奏"
     return {
         "risk": risk,
         "level": level,
@@ -141,7 +142,7 @@ def rule_profile(employee, records=None):
         "performance": employee.get("performanceRating") or employee.get("performance") or "待分析",
         "attendance": f"加班{overtime:g}h / 迟到{late_count}次 / 请假{leave_days:g}天",
         "communication": f"距上次沟通 {last_gap} 天" if last_gap is not None else "暂无沟通记录",
-        "suggestedAction": "优先安排 1 对 1 沟通并形成跟进行动" if level in ("高风险", "中风险") else "保持常规沟通节奏",
+        "suggestedAction": action,
         "lifecycleStage": lifecycle["stage"],
         "lifecycleDetail": lifecycle["detail"],
         "source": "规则引擎",

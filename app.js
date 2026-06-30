@@ -271,7 +271,7 @@ function renderBrief(brief) {
       insights.appendChild(card);
     });
   }
-  renderFocusDetail(todoById(selectedFocusId) || smartTodos[0]);
+  renderFocusDetail(selectedFocusItem());
 }
 
 async function loadBrief() {
@@ -368,13 +368,55 @@ function dotsForLevel(level = "medium") {
 }
 
 function todoStatus(item) {
+  if (item.status && item.status !== "待处理") return item.status;
   if (item.level === "high") return "今日处理";
   if (item.badge?.includes("9 天")) return "本周评估";
   if (item.badge?.includes("本周")) return "节点提醒";
   return "待处理";
 }
 
-function selectedFocusItem(items = smartTodos) {
+function focusLevelFromEmployee(employee) {
+  if (employee.level === "高风险" || employee.risk >= 75) return "high";
+  if (employee.level === "中风险" || employee.risk >= 55) return "medium";
+  return "low";
+}
+
+function focusPriority(employee) {
+  if (employee.level === "高风险" || employee.risk >= 75) return "P1";
+  if (employee.level === "中风险" || employee.risk >= 55) return "P2";
+  return "P3";
+}
+
+function shouldShowInFocus(employee) {
+  return ["高风险", "中风险"].includes(employee.level)
+    || employee.risk >= 40
+    || employee.modelRequired
+    || ["待模型精算", "待分析"].includes(employee.analysisStatus);
+}
+
+function buildFocusQueue() {
+  return archiveEmployees
+    .filter(shouldShowInFocus)
+    .map((employee) => {
+      const relatedTodo = smartTodos.find((todo) => todo.employeeKey === employee.key);
+      const evidence = employee.evidence?.length ? employee.evidence : employee.riskFactors || [];
+      return {
+        id: `focus-${employee.key}`,
+        todoId: relatedTodo?.id || "",
+        employeeKey: employee.key,
+        priority: relatedTodo?.priority || focusPriority(employee),
+        title: relatedTodo?.title || employee.suggestedAction || employee.goal || "安排一次状态确认",
+        badge: employee.level,
+        summary: employee.reason || relatedTodo?.summary || "规则扫描未发现完整风险说明。",
+        tags: evidence,
+        level: relatedTodo?.level || focusLevelFromEmployee(employee),
+        status: relatedTodo?.status || "",
+      };
+    })
+    .sort((left, right) => (employees[right.employeeKey]?.risk || 0) - (employees[left.employeeKey]?.risk || 0));
+}
+
+function selectedFocusItem(items = buildFocusQueue()) {
   if (!selectedFocusId && items.length) selectedFocusId = items[0].id;
   if (selectedFocusId && !items.some((item) => item.id === selectedFocusId)) selectedFocusId = items[0]?.id || "";
   return items.find((item) => item.id === selectedFocusId) || items[0];
@@ -429,19 +471,19 @@ function renderFocusDetail(item) {
   detail.querySelector("[data-focus-open]")?.addEventListener("click", (event) => openEmployeeDrawer(event.currentTarget.dataset.focusOpen, item.id));
   detail.querySelector("[data-focus-outline]")?.addEventListener("click", (event) => generateOutlineInModal(event.currentTarget.dataset.focusOutline));
   detail.querySelector("[data-focus-workbench]")?.addEventListener("click", () => {
-    selectedTodoId = item.id;
+    selectedTodoId = item.todoId || item.id;
     showView("todo-workbench");
     document.querySelectorAll(".nav-item").forEach((button) => button.classList.toggle("active", button.dataset.viewTarget === "todo-workbench"));
   });
   initIcons();
 }
 
-function renderRiskTable(items) {
+function renderRiskTable() {
   const table = document.querySelector("[data-risk-table]");
   const header = table.querySelector(".table-head");
   table.innerHTML = "";
   table.appendChild(header);
-  const source = (items && items.length ? items : smartTodos).slice(0, 5);
+  const source = buildFocusQueue();
   selectedFocusItem(source);
   if (!source.length) {
     const row = document.createElement("div");
@@ -464,6 +506,7 @@ function renderRiskTable(items) {
       selectedFocusId = item.id;
       renderRiskTable(source);
     });
+    row.addEventListener("dblclick", () => openEmployeeDrawer(employeeKey, item.todoId || item.id));
     table.appendChild(row);
   });
   renderFocusDetail(selectedFocusItem(source));
@@ -630,6 +673,91 @@ function renderEmployeeProfile(employeeKey, profile) {
   });
 }
 
+function latestCommunicationForEmployee(employee) {
+  return communicationRecords
+    .filter((record) => record.employeeKey === employee.key || record.employee === employee.name)
+    .sort((left, right) => String(right.date || "").localeCompare(String(left.date || "")))[0];
+}
+
+function employeeStage(employee) {
+  return employee.lifecycle?.stage || employee.lifecycleStage || profileFallbacks[employee.key]?.lifecycleStage || "待分析";
+}
+
+function riskClass(employee) {
+  if (employee.level === "高风险" || employee.risk >= 75) return "high";
+  if (employee.level === "中风险" || employee.risk >= 55) return "medium";
+  if (employee.level === "低风险" || employee.risk >= 40) return "low";
+  return "normal";
+}
+
+function drawerField(label, value) {
+  return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "待补充")}</strong></div>`;
+}
+
+function drawerEventItem(title, detail) {
+  return `<div class="drawer-list-item"><strong>${escapeHtml(title || "未命名事项")}</strong><span>${escapeHtml(detail || "暂无补充说明")}</span></div>`;
+}
+
+function renderDrawerArchiveDetails(employeeKey, activeTab = "basic") {
+  const employee = employees[employeeKey];
+  const tabs = document.querySelector("[data-drawer-profile-tabs]");
+  const detail = document.querySelector("[data-drawer-profile-detail]");
+  if (!employee || !tabs || !detail) return;
+  const latestRecord = latestCommunicationForEmployee(employee);
+  const tabItems = [
+    { key: "basic", label: "基本信息" },
+    { key: "performance", label: "绩效" },
+    { key: "growth", label: "成长" },
+    { key: "awards", label: "获奖" },
+    { key: "attendance", label: "考勤" },
+    { key: "events", label: "关键事件" }
+  ];
+  tabs.innerHTML = tabItems.map((item) => `<button class="${item.key === activeTab ? "active" : ""}" type="button" data-drawer-profile-tab="${escapeHtml(item.key)}">${escapeHtml(item.label)}</button>`).join("");
+  const panels = {
+    basic: `<div class="drawer-profile-grid">
+      ${drawerField("工号", employee.employeeId)}
+      ${drawerField("部门", employee.department)}
+      ${drawerField("岗位", employee.role)}
+      ${drawerField("入职日期", employee.hireDate)}
+      ${drawerField("直属主管", employee.manager)}
+      ${drawerField("最近沟通", latestRecord?.date)}
+      ${drawerField("合同到期", employee.contractEndDate)}
+      ${drawerField("转正日期", employee.probationEndDate)}
+    </div>`,
+    performance: `<div class="drawer-profile-grid">
+      ${drawerField("当前绩效", employee.performanceRating)}
+      ${drawerField("绩效趋势", employee.performanceTrend)}
+      ${drawerField("目标完成率", employee.goalCompletionRate ? `${employee.goalCompletionRate}%` : "")}
+      ${drawerField("AI 绩效判断", employee.performance)}
+    </div>`,
+    growth: `<div class="drawer-profile-grid">
+      ${drawerField("生命周期阶段", employeeStage(employee))}
+      ${drawerField("导师", employee.mentor)}
+      ${drawerField("成长摘要", employee.growthSummary)}
+      ${drawerField("建议动作", employee.suggestedAction || employee.goal)}
+    </div>`,
+    awards: `<div class="drawer-profile-grid">
+      ${drawerField("获奖摘要", employee.awardsSummary)}
+      ${drawerField("正向记录", employee.awardsSummary || "暂无获奖记录")}
+    </div>`,
+    attendance: `<div class="drawer-profile-grid">
+      ${drawerField("30天加班", employee.overtimeHours30d ? `${employee.overtimeHours30d}h` : "")}
+      ${drawerField("30天迟到", employee.lateCount30d)}
+      ${drawerField("30天请假", employee.leaveDays30d)}
+      ${drawerField("AI 考勤判断", employee.attendance)}
+    </div>`,
+    events: `<div class="drawer-list">
+      ${drawerEventItem("备注/关键事件", employee.keyEvents)}
+      ${drawerEventItem("风险原因", employee.reason)}
+      ${drawerEventItem("最近沟通", latestRecord ? `${latestRecord.date} · ${latestRecord.summary}` : "暂无沟通记录")}
+    </div>`
+  };
+  detail.innerHTML = panels[activeTab] || panels.basic;
+  tabs.querySelectorAll("[data-drawer-profile-tab]").forEach((button) => {
+    button.addEventListener("click", () => renderDrawerArchiveDetails(employeeKey, button.dataset.drawerProfileTab));
+  });
+}
+
 function renderDrawerWorkflow(employeeKey) {
   const employee = employees[employeeKey];
   const todoBox = document.querySelector("[data-drawer-todos]");
@@ -656,6 +784,7 @@ async function openEmployeeDrawer(employeeKey, todoId = "") {
   document.querySelector("[data-drawer-risk]").textContent = employee.risk || "--";
   document.querySelector("[data-drawer-level]").textContent = employee.level;
   renderEmployeeProfile(employeeKey, profileFallbacks[employeeKey]);
+  renderDrawerArchiveDetails(employeeKey);
   renderDrawerWorkflow(employeeKey);
   document.body.classList.add("drawer-open");
   drawer.setAttribute("aria-hidden", "false");
@@ -851,16 +980,35 @@ function renderArchiveEmployees() {
   const table = document.querySelector("[data-employee-table]");
   if (!table) return;
   document.querySelector("[data-employee-count]").textContent = `${archiveEmployees.length} 人`;
-  table.innerHTML = `<div class="archive-row archive-row-head archive-employee-row"><span>姓名</span><span>工号</span><span>部门</span><span>岗位</span><span>职级</span><span>绩效</span><span>趋势</span><span>目标%</span><span>加班h</span><span>迟到</span><span>合同到期</span><span>转正</span><span>薪酬信号</span><span>操作</span></div>${archiveEmployees.map((employee) => `<div class="archive-row archive-employee-row" data-row-key="${escapeHtml(employee.key)}"><span class="archive-person">${editableCell(employee.name, "employee", "name")}</span>${editableCell(employee.employeeId || "", "employee", "employeeId")}${editableCell(employee.department || "", "employee", "department")}${editableCell(employee.role || "", "employee", "role")}${editableCell(employee.jobLevel || "", "employee", "jobLevel")}${editableCell(employee.performanceRating || "", "employee", "performanceRating")}${editableCell(employee.performanceTrend || "", "employee", "performanceTrend")}${editableCell(employee.goalCompletionRate || "", "employee", "goalCompletionRate")}${editableCell(employee.overtimeHours30d || "", "employee", "overtimeHours30d")}${editableCell(employee.lateCount30d || "", "employee", "lateCount30d")}${editableCell(employee.contractEndDate || "", "employee", "contractEndDate")}${editableCell(employee.probationEndDate || "", "employee", "probationEndDate")}${editableCell(employee.compensationSignal || "", "employee", "compensationSignal")}<span class="row-actions"><button class="mini-action" type="button" data-analyze-employee="${escapeHtml(employee.key)}">${employee.analysisStatus === "已分析" ? "重新分析" : employee.analysisStatus === "待模型精算" ? "精算" : "AI分析"}</button><button class="mini-action danger-action" type="button" data-delete-employee="${escapeHtml(employee.key)}"><i data-lucide="trash-2"></i><span>删除</span></button></span></div>`).join("")}`;
+  table.innerHTML = `<div class="archive-row archive-row-head archive-employee-row"><span>姓名</span><span>工号</span><span>部门</span><span>岗位</span><span>阶段</span><span>风险等级</span><span>最近沟通</span><span>操作</span></div>${archiveEmployees.map((employee) => {
+    const latestRecord = latestCommunicationForEmployee(employee);
+    const level = employee.level || "待分析";
+    return `<div class="archive-row archive-employee-row" data-row-key="${escapeHtml(employee.key)}" title="双击查看员工画像">
+      <span class="archive-person">${editableCell(employee.name, "employee", "name")}</span>
+      ${editableCell(employee.employeeId || "", "employee", "employeeId")}
+      ${editableCell(employee.department || "", "employee", "department")}
+      ${editableCell(employee.role || "", "employee", "role")}
+      <span class="stage-pill">${escapeHtml(employeeStage(employee))}</span>
+      <span class="status-pill ${escapeHtml(riskClass(employee))}">${escapeHtml(level)}</span>
+      <span>${escapeHtml(latestRecord?.date || "暂无")}</span>
+      <span class="row-actions"><button class="mini-action danger-action" type="button" data-delete-employee="${escapeHtml(employee.key)}"><i data-lucide="trash-2"></i><span>删除</span></button></span>
+    </div>`;
+  }).join("")}`;
   table.querySelectorAll("[data-edit-entity]").forEach((cell) => {
     cell.dataset.rowKey = cell.closest("[data-row-key]")?.dataset.rowKey || "";
   });
   bindEditableCells(table);
-  table.querySelectorAll("[data-analyze-employee]").forEach((button) => {
-    button.addEventListener("click", () => analyzeEmployee(button.dataset.analyzeEmployee, button));
+  table.querySelectorAll(".archive-employee-row[data-row-key]").forEach((row) => {
+    row.addEventListener("dblclick", (event) => {
+      if (event.target.closest("button")) return;
+      openEmployeeDrawer(row.dataset.rowKey);
+    });
   });
   table.querySelectorAll("[data-delete-employee]").forEach((button) => {
-    button.addEventListener("click", () => deleteEmployee(button.dataset.deleteEmployee));
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      deleteEmployee(button.dataset.deleteEmployee);
+    });
   });
 }
 
@@ -985,7 +1133,7 @@ function normalizeEmployeeRecord(row) {
     mentor: row.mentor || row.导师 || "",
     growthSummary: row.growthSummary || row.成长摘要 || row.成长信息 || "",
     awardsSummary: row.awardsSummary || row.奖励摘要 || row.获奖信息 || "",
-    keyEvents: row.keyEvents || row.关键事件 || "",
+    keyEvents: row.keyEvents || row.备注 || row.关键事件 || "",
     compensationSignal: row.compensationSignal || row.薪酬信号 || row.薪酬风险 || "",
     lifecycle: "待分析",
     level: "待分析"
@@ -1040,12 +1188,9 @@ function activateArchive() {
       employeeId: form.get("employeeId"),
       department: form.get("department"),
       role: form.get("role"),
-      jobLevel: form.get("jobLevel"),
       hireDate: form.get("hireDate"),
       manager: form.get("manager"),
       performanceRating: form.get("performanceRating"),
-      performanceTrend: form.get("performanceTrend"),
-      goalCompletionRate: form.get("goalCompletionRate"),
       overtimeHours30d: form.get("overtimeHours30d"),
       lateCount30d: form.get("lateCount30d"),
       leaveDays30d: form.get("leaveDays30d"),
@@ -1054,7 +1199,7 @@ function activateArchive() {
       mentor: form.get("mentor"),
       growthSummary: form.get("growthSummary"),
       awardsSummary: form.get("awardsSummary"),
-      compensationSignal: form.get("compensationSignal"),
+      keyEvents: form.get("keyEvents"),
       lifecycle: "待分析",
       level: "待分析"
     };

@@ -145,7 +145,7 @@
             <section class="risk-table-section">
               <div class="section-head compact">
                 <h2>关注队列</h2>
-                <small>点击员工查看判断与动作</small>
+                <small>双击员工查看画像</small>
               </div>
 
               <div class="risk-table" data-risk-table>
@@ -165,13 +165,6 @@
               </div>
             </section>
 
-            <aside class="focus-detail" data-focus-detail>
-              <div class="empty-detail">
-                <i data-lucide="mouse-pointer-click"></i>
-                <h2>选择一名员工</h2>
-                <p>这里会合并展示管理研判、风险依据和下一步动作。</p>
-              </div>
-            </aside>
           </div>
         </section>
         </section>
@@ -251,12 +244,9 @@
                 <label><span>工号</span><input name="employeeId" placeholder="例如：E2026012" /></label>
                 <label><span>部门</span><input name="department" placeholder="例如：研发部" /></label>
                 <label><span>职务</span><input name="role" required placeholder="例如：后端工程师 · P5" /></label>
-                <label><span>职级</span><input name="jobLevel" placeholder="例如：P5" /></label>
                 <label><span>入职时间</span><input name="hireDate" type="date" /></label>
                 <label><span>直属主管</span><input name="manager" placeholder="例如：姚老师" /></label>
                 <label><span>当前绩效</span><input name="performanceRating" placeholder="例如：B+" /></label>
-                <label><span>绩效趋势</span><input name="performanceTrend" placeholder="例如：明显下滑/稳定/上升" /></label>
-                <label><span>目标完成率</span><input name="goalCompletionRate" type="number" min="0" max="100" placeholder="例如：82" /></label>
                 <label><span>30天加班h</span><input name="overtimeHours30d" type="number" min="0" step="0.5" placeholder="例如：28" /></label>
                 <label><span>30天迟到</span><input name="lateCount30d" type="number" min="0" placeholder="例如：4" /></label>
                 <label><span>30天请假</span><input name="leaveDays30d" type="number" min="0" step="0.5" placeholder="例如：2" /></label>
@@ -265,7 +255,7 @@
                 <label><span>导师</span><input name="mentor" placeholder="例如：导师姓名" /></label>
                 <label><span>成长摘要</span><input name="growthSummary" placeholder="例如：停滞/正常/晋升受阻" /></label>
                 <label><span>奖励摘要</span><input name="awardsSummary" placeholder="例如：Q1优秀员工" /></label>
-                <label><span>薪酬信号</span><input name="compensationSignal" placeholder="例如：无/不满/外部机会" /></label>
+                <label><span>备注</span><input name="keyEvents" placeholder="补充关键事项、管理备注" /></label>
                 <button class="primary-btn" type="submit"><i data-lucide="plus"></i><span>新增员工</span></button>
               </form>
             </div>
@@ -340,6 +330,10 @@
       <section class="drawer-section">
         <h3>生命周期</h3>
         <p><strong data-drawer-lifecycle-stage>待分析</strong>：<span data-drawer-lifecycle-detail>补充入职时间后自动判断生命周期阶段。</span></p>
+      </section>
+      <section class="drawer-section drawer-profile-section">
+        <div class="drawer-profile-tabs" data-drawer-profile-tabs></div>
+        <div class="drawer-profile-detail" data-drawer-profile-detail></div>
       </section>
       <section class="drawer-section">
         <h3>关联待办</h3>

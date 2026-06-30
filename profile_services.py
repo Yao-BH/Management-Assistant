@@ -6,6 +6,7 @@ from context_services import get_archive
 from prompts import PROFILE_SYSTEM_PROMPT
 from risk_engine import infer_level, rule_profile
 from service_common import client, model_source, parse_json_object
+from todo_services import sync_employee_todo
 
 
 def fallback_profile_for(employee):
@@ -68,7 +69,8 @@ def analyze_changed_employee(employee_key, use_model=True):
         or employee.get("modelRequired")
         or employee.get("analysisStatus") in ("待分析", "待模型精算")
     )
-    database.save_rule_analysis(employee_key, profile, model_required=needs_model)
+    rule_employee = database.save_rule_analysis(employee_key, profile, model_required=needs_model)
+    sync_employee_todo(rule_employee)
     if needs_model:
         return generate_employee_profile(employee_key, persist=True)
     return {"employee": database.get_employee(employee_key), "profile": profile, "archive": get_archive()}
@@ -117,5 +119,6 @@ def generate_employee_profile(employee_key=None, employee=None, persist=False):
 
     if persist:
         updated = database.save_analysis(employee["key"], profile)
+        sync_employee_todo(updated)
         return {"employee": updated, "profile": profile, "archive": get_archive()}
     return {**profile, "source": profile.get("source", "SQLite 本地分析")}
