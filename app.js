@@ -125,6 +125,7 @@ let communicationRecords = [
 ];
 
 let smartTodos = [...fallbackTodos];
+let selectedTodoId = "";
 
 function initIcons() {
   if (window.lucide) window.lucide.createIcons();
@@ -231,6 +232,7 @@ function applyArchivePayload(payload = {}) {
   renderArchive();
   renderMetrics(payload.metrics || deriveDashboardMetrics());
   renderRiskTable(smartTodos);
+  renderTodoWorkbench();
 }
 
 async function loadArchive() {
@@ -241,6 +243,7 @@ async function loadArchive() {
     syncEmployeesFromArchive();
     renderArchive();
     renderRiskTable(smartTodos);
+    renderTodoWorkbench();
   }
 }
 
@@ -467,14 +470,129 @@ function renderRiskTable(items) {
   });
 }
 
+function statusClass(status = "待处理") {
+  if (status === "已完成") return "done";
+  if (status === "处理中") return "active";
+  if (status === "已忽略") return "muted";
+  return "open";
+}
+
+function todoLevelLabel(level = "medium") {
+  if (level === "high") return "高优先级";
+  if (level === "low") return "低优先级";
+  return "中优先级";
+}
+
+function todoById(todoId) {
+  return smartTodos.find((item) => item.id === todoId);
+}
+
+function renderTodoWorkbench() {
+  const list = document.querySelector("[data-todo-list]");
+  const count = document.querySelector("[data-todo-count]");
+  if (!list) return;
+  const items = smartTodos || [];
+  if (count) count.textContent = `${items.length} 项`;
+  if (!selectedTodoId && items.length) selectedTodoId = items[0].id;
+  if (selectedTodoId && !todoById(selectedTodoId)) selectedTodoId = items[0]?.id || "";
+  list.innerHTML = "";
+  if (!items.length) {
+    list.innerHTML = `<div class="todo-empty">暂无待办，可先补充员工沟通记录或运行 AI 分析。</div>`;
+    renderTodoDetail(null);
+    return;
+  }
+  items.forEach((item) => {
+    const employee = employees[item.employeeKey] || {};
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = `todo-card ${item.id === selectedTodoId ? "selected" : ""} ${statusClass(item.status)}`;
+    button.innerHTML = `
+      <span class="todo-priority ${escapeHtml(item.level || "medium")}">${escapeHtml(item.priority || "P-")}</span>
+      <strong>${escapeHtml(item.title || "待办动作")}</strong>
+      <small>${escapeHtml(employee.name || item.employeeKey || "未关联员工")} · ${escapeHtml(todoLevelLabel(item.level))}</small>
+      <em>${escapeHtml(item.status || "待处理")}</em>
+    `;
+    button.addEventListener("click", () => {
+      selectedTodoId = item.id;
+      renderTodoWorkbench();
+    });
+    list.appendChild(button);
+  });
+  renderTodoDetail(todoById(selectedTodoId));
+  initIcons();
+}
+
+function renderTodoDetail(item) {
+  const panel = document.querySelector("[data-todo-detail]");
+  if (!panel) return;
+  if (!item) {
+    panel.innerHTML = `<div class="empty-detail"><i data-lucide="mouse-pointer-click"></i><h2>选择一项待办</h2><p>这里会展示员工风险、建议动作和完成闭环入口。</p></div>`;
+    initIcons();
+    return;
+  }
+  const employee = employees[item.employeeKey] || {};
+  const records = communicationRecords.filter((record) => record.employeeKey === item.employeeKey || record.employee === employee.name).slice(0, 3);
+  panel.innerHTML = `
+    <div class="todo-detail-head">
+      <div>
+        <p class="eyebrow">Selected Action</p>
+        <h2>${escapeHtml(item.title)}</h2>
+      </div>
+      <span class="status-pill ${escapeHtml(item.level || "medium")}">${escapeHtml(item.status || "待处理")}</span>
+    </div>
+    <div class="todo-person-strip">
+      <b>${escapeHtml((employee.name || "?").slice(0, 1))}</b>
+      <div><strong>${escapeHtml(employee.name || "未关联员工")}</strong><span>${escapeHtml(employee.role || "暂无职务信息")}</span></div>
+      <button type="button" data-todo-open-employee><i data-lucide="user-round-search"></i><span>查看画像</span></button>
+    </div>
+    <section class="todo-glass-section">
+      <h3>风险依据</h3>
+      <p>${escapeHtml(item.summary || employee.reason || "暂无风险摘要")}</p>
+      <div class="drawer-tags">${(item.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>
+    </section>
+    <section class="todo-glass-section">
+      <h3>最近沟通</h3>
+      <div class="mini-records">${records.length ? records.map((record) => `<div><strong>${escapeHtml(record.date || "-")} · ${escapeHtml(record.type || "-")}</strong><span>${escapeHtml(record.summary || "-")}</span></div>`).join("") : "<p>暂无沟通记录，建议先完成一次管理沟通。</p>"}</div>
+    </section>
+    <div class="todo-actions">
+      <button type="button" data-todo-status="处理中"><i data-lucide="play-circle"></i><span>开始处理</span></button>
+      <button type="button" data-todo-outline><i data-lucide="wand-sparkles"></i><span>生成提纲</span></button>
+      <button type="button" data-todo-complete><i data-lucide="check-circle-2"></i><span>记录沟通并完成</span></button>
+      <button type="button" data-todo-status="已忽略"><i data-lucide="circle-slash"></i><span>忽略</span></button>
+    </div>
+  `;
+  panel.querySelector("[data-todo-open-employee]")?.addEventListener("click", () => openEmployeeDrawer(item.employeeKey, item.id));
+  panel.querySelector("[data-todo-outline]")?.addEventListener("click", () => generateOutlineInModal(item.employeeKey));
+  panel.querySelector("[data-todo-complete]")?.addEventListener("click", () => openEmployeeDrawer(item.employeeKey, item.id));
+  panel.querySelectorAll("[data-todo-status]").forEach((button) => {
+    button.addEventListener("click", () => updateTodoStatus(item.id, button.dataset.todoStatus));
+  });
+  initIcons();
+}
+
+async function updateTodoStatus(todoId, status) {
+  if (!todoId || !status) return;
+  try {
+    const result = await postJson("/api/todos/status", { todoId, status });
+    if (result.archive) applyArchivePayload(result.archive);
+  } catch {
+    const item = todoById(todoId);
+    if (item) item.status = status;
+    renderTodoWorkbench();
+    renderRiskTable(smartTodos);
+  }
+}
+
 async function loadRiskTable() {
   try {
     const result = await postJson("/api/todos");
     smartTodos = result.items || smartTodos;
     renderRiskTable(smartTodos);
+    renderTodoWorkbench();
     loadMetrics();
   } catch {
     renderRiskTable(smartTodos);
+    renderTodoWorkbench();
   }
 }
 
@@ -495,16 +613,33 @@ function renderEmployeeProfile(employeeKey, profile) {
   });
 }
 
-async function openEmployeeDrawer(employeeKey) {
+function renderDrawerWorkflow(employeeKey) {
+  const employee = employees[employeeKey];
+  const todoBox = document.querySelector("[data-drawer-todos]");
+  const recordBox = document.querySelector("[data-drawer-records]");
+  if (!employee || !todoBox || !recordBox) return;
+  const relatedTodos = smartTodos.filter((item) => item.employeeKey === employeeKey);
+  const relatedRecords = communicationRecords.filter((record) => record.employeeKey === employeeKey || record.employee === employee.name).slice(0, 5);
+  todoBox.innerHTML = relatedTodos.length
+    ? relatedTodos.map((item) => `<div class="drawer-list-item"><strong>${escapeHtml(item.title)}</strong><span>${escapeHtml(item.priority || "-")} · ${escapeHtml(item.status || "待处理")}</span></div>`).join("")
+    : `<div class="drawer-list-item muted"><strong>暂无关联待办</strong><span>可从 Agent 或待办工作台生成。</span></div>`;
+  recordBox.innerHTML = relatedRecords.length
+    ? relatedRecords.map((record) => `<div class="drawer-list-item"><strong>${escapeHtml(record.date || "-")} · ${escapeHtml(record.type || "-")}</strong><span>${escapeHtml(record.summary || "-")}</span></div>`).join("")
+    : `<div class="drawer-list-item muted"><strong>暂无沟通记录</strong><span>记录一次沟通后会自动进入历史。</span></div>`;
+}
+
+async function openEmployeeDrawer(employeeKey, todoId = "") {
   const employee = employees[employeeKey];
   if (!employee) return;
   const drawer = document.querySelector("[data-employee-drawer]");
   drawer.dataset.employee = employeeKey;
+  drawer.dataset.todo = todoId || selectedTodoId || "";
   document.querySelector("[data-drawer-name]").textContent = employee.name;
   document.querySelector("[data-drawer-role]").textContent = employee.role;
   document.querySelector("[data-drawer-risk]").textContent = employee.risk || "--";
   document.querySelector("[data-drawer-level]").textContent = employee.level;
   renderEmployeeProfile(employeeKey, profileFallbacks[employeeKey]);
+  renderDrawerWorkflow(employeeKey);
   document.body.classList.add("drawer-open");
   drawer.setAttribute("aria-hidden", "false");
   try {
@@ -591,6 +726,7 @@ function renderArchive() {
   updateCommunicationEmployeeOptions();
   initIcons();
   refreshDashboardMetrics();
+  renderTodoWorkbench();
 }
 
 async function analyzeEmployee(employeeKey, trigger) {
@@ -611,6 +747,47 @@ async function analyzeEmployee(employeeKey, trigger) {
     if (trigger) trigger.textContent = previousText || "AI分析";
   } finally {
     if (trigger) trigger.disabled = false;
+  }
+}
+
+async function completeDrawerCommunication(event) {
+  event.preventDefault();
+  const drawer = document.querySelector("[data-employee-drawer]");
+  const employeeKey = drawer?.dataset.employee || "";
+  const employee = employees[employeeKey];
+  if (!employee) return;
+  const form = new FormData(event.currentTarget);
+  const submitButton = event.currentTarget.querySelector("button[type='submit']");
+  const record = {
+    employeeKey,
+    employee: employee.name,
+    date: form.get("date") || new Date().toISOString().slice(0, 10),
+    type: form.get("type"),
+    summary: form.get("summary") || `已完成${employee.name}的管理沟通。`,
+    action: form.get("action") || "持续跟进沟通结论"
+  };
+  const todoId = drawer.dataset.todo || selectedTodoId || "";
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.querySelector("span").textContent = "闭环中";
+  }
+  try {
+    const result = await postJson("/api/communication/complete", { record, todoId });
+    event.currentTarget.reset();
+    if (result.archive) applyArchivePayload(result.archive);
+    renderDrawerWorkflow(employeeKey);
+    await loadBrief();
+  } catch {
+    communicationRecords.unshift(record);
+    smartTodos = smartTodos.map((item) => item.id === todoId || item.employeeKey === employeeKey ? { ...item, status: "已完成" } : item);
+    renderArchive();
+    renderRiskTable(smartTodos);
+    renderDrawerWorkflow(employeeKey);
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.querySelector("span").textContent = "记录并完成待办";
+    }
   }
 }
 
@@ -758,10 +935,16 @@ function activateUi() {
     const key = document.querySelector("[data-employee-drawer]").dataset.employee || "zhangsan";
     generateOutlineInModal(key);
   });
+  document.querySelector("[data-drawer-analyze]")?.addEventListener("click", () => {
+    const key = document.querySelector("[data-employee-drawer]").dataset.employee || "";
+    analyzeEmployee(key, document.querySelector("[data-drawer-analyze]"));
+  });
+  document.querySelector("[data-drawer-communication-form]")?.addEventListener("submit", completeDrawerCommunication);
   document.querySelector("[data-close-outline]")?.addEventListener("click", closeOutlineModal);
   document.querySelector("[data-outline-modal-backdrop]")?.addEventListener("click", closeOutlineModal);
   document.querySelector("[data-generate-brief]")?.addEventListener("click", loadBrief);
   document.querySelector("[data-refresh-risk-list]")?.addEventListener("click", loadRiskTable);
+  document.querySelector("[data-refresh-todos]")?.addEventListener("click", loadRiskTable);
   document.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       closeEmployeeDrawer();

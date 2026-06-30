@@ -60,6 +60,25 @@ def save_communication(record):
     return {"record": saved, "archive": get_archive()}
 
 
+def complete_communication_workflow(record, todo_id=None):
+    saved = database.add_communication_record(record)
+    employee_key = saved.get("employeeKey") or record.get("employeeKey", "")
+    if todo_id:
+        database.update_todo_status(todo_id, "已完成")
+    elif employee_key:
+        database.complete_employee_todos(employee_key)
+    return {"record": saved, "archive": get_archive()}
+
+
+def update_todo_status(todo_id, status):
+    if status not in ("待处理", "处理中", "已完成", "已忽略"):
+        raise ValueError("Invalid todo status")
+    todo = database.update_todo_status(todo_id, status)
+    if not todo:
+        raise ValueError("Todo not found")
+    return {"todo": todo, "archive": get_archive()}
+
+
 def get_metrics():
     context = build_team_context()
     summary = context["summary"]

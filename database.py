@@ -334,8 +334,28 @@ def add_communication_record(record):
 
 def list_todos():
     with connect() as db:
-        rows = db.execute("SELECT * FROM todos ORDER BY priority, created_at DESC").fetchall()
+        rows = db.execute(
+            """
+            SELECT * FROM todos
+            ORDER BY
+                CASE status
+                    WHEN '待处理' THEN 0
+                    WHEN '处理中' THEN 1
+                    WHEN '已完成' THEN 2
+                    WHEN '已忽略' THEN 3
+                    ELSE 4
+                END,
+                priority,
+                created_at DESC
+            """
+        ).fetchall()
         return [row_to_todo(row) for row in rows]
+
+
+def get_todo(todo_id):
+    with connect() as db:
+        row = db.execute("SELECT * FROM todos WHERE id = ?", (todo_id,)).fetchone()
+        return row_to_todo(row) if row else None
 
 
 def upsert_todo(db, item):
@@ -382,4 +402,23 @@ def add_todo(item):
     with connect() as db:
         item = {**item, "id": item.get("id") or f"manual-{date.today().isoformat()}-{item.get('employeeKey', 'todo')}", "source": "manual"}
         upsert_todo(db, item)
+    return list_todos()
+
+
+def update_todo_status(todo_id, status):
+    with connect() as db:
+        db.execute("UPDATE todos SET status = ? WHERE id = ?", (status, todo_id))
+    return get_todo(todo_id)
+
+
+def complete_employee_todos(employee_key):
+    with connect() as db:
+        db.execute(
+            """
+            UPDATE todos
+            SET status = '已完成'
+            WHERE employee_key = ? AND status NOT IN ('已完成', '已忽略')
+            """,
+            (employee_key,),
+        )
     return list_todos()

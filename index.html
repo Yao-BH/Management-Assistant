@@ -20,7 +20,7 @@
         <nav class="nav-list">
           <button class="nav-item active" type="button" data-view-target="dashboard"><i data-lucide="home"></i><span>管理面板</span></button>
           <button class="nav-item" type="button"><i data-lucide="bar-chart-3"></i><span>统计洞察</span></button>
-          <button class="nav-item" type="button"><i data-lucide="clipboard-list"></i><span>待办任务</span></button>
+          <button class="nav-item" type="button" data-view-target="todo-workbench"><i data-lucide="clipboard-list"></i><span>待办任务</span></button>
           <button class="nav-item" type="button" data-view-target="employee-archive"><i data-lucide="users-round"></i><span>员工档案</span></button>
           <button class="nav-item" type="button"><i data-lucide="bell"></i><span>提醒中心</span></button>
         </nav>
@@ -185,6 +185,35 @@
         </section>
         </section>
 
+        <section class="view-panel todo-view" data-view="todo-workbench" hidden>
+          <div class="archive-head panel liquid-head">
+            <div>
+              <p class="eyebrow">Action Loop</p>
+              <h2>待办任务工作台</h2>
+              <p>从风险识别进入管理动作：选择待办、查看员工画像、生成沟通提纲，完成沟通后自动回写状态。</p>
+            </div>
+            <button class="primary-btn" type="button" data-refresh-todos><i data-lucide="refresh-cw"></i><span>刷新待办</span></button>
+          </div>
+
+          <section class="todo-workbench-grid">
+            <article class="panel todo-list-panel">
+              <div class="section-head">
+                <h2>智能待办队列</h2>
+                <small data-todo-count>0 项</small>
+              </div>
+              <div class="todo-list" data-todo-list></div>
+            </article>
+
+            <article class="panel todo-detail-panel" data-todo-detail>
+              <div class="empty-detail">
+                <i data-lucide="mouse-pointer-click"></i>
+                <h2>选择一项待办</h2>
+                <p>这里会展示员工风险、建议动作和完成闭环入口。</p>
+              </div>
+            </article>
+          </section>
+        </section>
+
         <section class="view-panel archive-view" data-view="employee-archive" hidden>
           <div class="archive-head panel">
             <div>
@@ -290,8 +319,27 @@
         <h3>生命周期</h3>
         <p><strong data-drawer-lifecycle-stage>成长期</strong>：<span data-drawer-lifecycle-detail>重点关注目标承接、能力成长和稳定沟通节奏。</span></p>
       </section>
+      <section class="drawer-section">
+        <h3>关联待办</h3>
+        <div class="drawer-list" data-drawer-todos></div>
+      </section>
+      <section class="drawer-section">
+        <h3>历史沟通</h3>
+        <div class="drawer-list" data-drawer-records></div>
+      </section>
+      <section class="drawer-section">
+        <h3>记录沟通并闭环</h3>
+        <form class="drawer-communication-form" data-drawer-communication-form>
+          <input name="date" type="date" />
+          <select name="type"><option>1 对 1</option><option>转正面谈</option><option>绩效沟通</option><option>合同续签</option></select>
+          <textarea name="summary" rows="3" placeholder="记录本次沟通重点、员工状态和阻塞点"></textarea>
+          <input name="action" placeholder="后续动作，例如：两周后复盘目标进展" />
+          <button type="submit"><i data-lucide="check-circle-2"></i><span>记录并完成待办</span></button>
+        </form>
+      </section>
       <div class="drawer-actions">
         <button type="button" data-drawer-outline><i data-lucide="wand-sparkles"></i><span>生成沟通提纲</span></button>
+        <button type="button" data-drawer-analyze><i data-lucide="scan-search"></i><span>重新分析</span></button>
       </div>
     </aside>
 
