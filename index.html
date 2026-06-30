@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>员工管理助手</title>
+    <link rel="stylesheet" href="./styles.css?v=36" />
+    <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <script defer src="./app.js?v=36"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="主导航">
+        <div class="brand">
+          <div class="brand-mark">EA</div>
+          <strong>员工管理助手</strong>
+        </div>
+
+        <nav class="nav-list">
+          <button class="nav-item active" type="button" data-view-target="dashboard"><i data-lucide="home"></i><span>管理面板</span></button>
+          <button class="nav-item" type="button"><i data-lucide="bar-chart-3"></i><span>统计洞察</span></button>
+          <button class="nav-item" type="button"><i data-lucide="clipboard-list"></i><span>待办任务</span></button>
+          <button class="nav-item" type="button" data-view-target="employee-archive"><i data-lucide="users-round"></i><span>员工档案</span></button>
+          <button class="nav-item" type="button"><i data-lucide="bell"></i><span>提醒中心</span></button>
+        </nav>
+
+        <div class="nav-group">
+          <span>OTHER</span>
+          <button class="nav-item" type="button"><i data-lucide="settings"></i><span>系统设置</span></button>
+          <button class="nav-item" type="button"><i data-lucide="circle-help"></i><span>帮助中心</span></button>
+        </div>
+
+        <div class="manager">
+          <div class="manager-avatar">姚</div>
+          <div>
+            <strong>管理者视图</strong>
+            <span>授权团队范围</span>
+          </div>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <header class="topbar">
+          <h1>Analytical board</h1>
+          <div class="top-actions">
+            <button class="select-btn" type="button">Chart: Funnel <i data-lucide="chevron-down"></i></button>
+            <label class="search">
+              <i data-lucide="search"></i>
+              <input type="search" placeholder="搜索员工、风险、待办" />
+            </label>
+            <button class="icon-btn" type="button" aria-label="日历"><i data-lucide="calendar-days"></i></button>
+          </div>
+        </header>
+
+        <section class="view-panel active" data-view="dashboard">
+        <section class="hero-grid" aria-label="核心分析">
+          <section class="panel funnel-panel signal-panel" aria-label="团队状态信号板">
+            <div class="panel-title">
+              <div>
+                <p class="eyebrow">Team Signal Board</p>
+                <h2>团队状态信号板</h2>
+              </div>
+              <button class="select-btn small" type="button">This week <i data-lucide="chevron-down"></i></button>
+            </div>
+
+            <div class="signal-board">
+              <div class="signal-hero">
+                <span>整体健康度</span>
+                <strong data-signal-health>75%</strong>
+                <small>基于风险、沟通覆盖、关键节点综合判断</small>
+              </div>
+
+              <div class="signal-rings" aria-hidden="true">
+                <span class="ring ring-one"></span>
+                <span class="ring ring-two"></span>
+                <span class="ring ring-three"></span>
+                <i class="signal-dot high"></i>
+                <i class="signal-dot medium"></i>
+                <i class="signal-dot low"></i>
+              </div>
+
+              <div class="signal-bars">
+                <div>
+                  <span>状态稳定</span>
+                  <em><b data-signal-stable-bar></b></em>
+                  <strong data-funnel-stable>9</strong>
+                </div>
+                <div>
+                  <span>重点关注</span>
+                  <em><b data-signal-focus-bar></b></em>
+                  <strong data-funnel-focus>3</strong>
+                </div>
+                <div>
+                  <span>智能待办</span>
+                  <em><b data-signal-action-bar></b></em>
+                  <strong data-funnel-action>7</strong>
+                </div>
+                <div>
+                  <span>沟通覆盖</span>
+                  <em><b data-signal-coverage-bar></b></em>
+                  <strong data-signal-coverage>76%</strong>
+                </div>
+              </div>
+
+              <div class="signal-summary">
+                <div><span>团队人数</span><strong data-funnel-total>12</strong></div>
+                <div><span>关注占比</span><strong data-signal-focus-rate>25%</strong></div>
+                <div><span>本周节点</span><strong>2</strong></div>
+              </div>
+            </div>
+
+            <div class="kpi-strip" data-metrics>
+              <article class="kpi loading"><strong>--</strong><span>读取中</span></article>
+            </div>
+          </section>
+
+          <aside class="panel copilot-card" aria-label="AI 管理助手">
+            <div class="agent-copy">
+              <h2>管理助手 Agent</h2>
+            </div>
+            <img class="ai-orb" src="./assets/ai-fluid-orb.png" alt="3D 流体 AI 图标" />
+
+            <div class="agent-capabilities" aria-label="助手能力">
+              <span>员工画像</span>
+              <span>风险研判</span>
+              <span>待办编排</span>
+              <span>沟通提纲</span>
+            </div>
+
+            <div class="chat-preview">
+              <div class="bubble assistant intro" data-chat-answer>你可以问我：谁最需要关注、某位员工为什么有风险、今天应该先处理哪些管理动作。</div>
+            </div>
+
+            <div class="quick-actions" aria-label="AI 快捷动作">
+              <button type="button" data-quick-chat="请基于当前员工档案、沟通记录和待办，给出今天的处理优先级。" data-intent="today_priority">今日优先级</button>
+              <button type="button" data-quick-chat="请基于当前团队数据生成管理动作建议。" data-intent="management_actions">生成管理动作</button>
+              <button type="button" data-quick-chat="请解释当前重点风险员工的风险原因。" data-intent="risk_reason">解释风险原因</button>
+            </div>
+
+            <label class="chat-input">
+              <input type="text" placeholder="询问团队风险或员工状态" />
+              <button type="button" aria-label="发送"><i data-lucide="send-horizontal"></i></button>
+            </label>
+          </aside>
+        </section>
+
+        <section class="lower-grid">
+          <section class="risk-table-section">
+            <div class="section-head">
+              <h2>重点关注员工</h2>
+              <button type="button" data-refresh-risk-list>刷新</button>
+            </div>
+
+            <div class="risk-table" data-risk-table>
+              <div class="table-head">
+                <span>员工</span>
+                <span>优先级</span>
+                <span>风险依据</span>
+                <span>下一步动作</span>
+                <span>状态</span>
+              </div>
+
+              <div class="person-row loading-row">
+                <span class="person"><b>AI</b><em>正在生成</em></span>
+                <span>分析中</span>
+                <span>读取风险、节点和沟通逾期信息</span>
+                <span>生成下一步动作</span>
+                <span class="status-pill">待处理</span>
+              </div>
+            </div>
+          </section>
+
+          <section class="brief-panel panel">
+            <div class="panel-title">
+              <div>
+                <p class="eyebrow">AI Management Brief</p>
+                <h2 data-brief-title>今日管理研判</h2>
+              </div>
+              <button class="primary-btn" type="button" data-generate-brief><i data-lucide="sparkles"></i><span>生成简报</span></button>
+            </div>
+            <p data-brief-summary>团队整体稳定，当前重点关注 3 名员工。优先处理张三的绩效与压力沟通，并跟进王五转正、李四合同续签节点。</p>
+            <div class="brief-insights" data-brief-insights></div>
+          </section>
+        </section>
+        </section>
+
+        <section class="view-panel archive-view" data-view="employee-archive" hidden>
+          <div class="archive-head panel">
+            <div>
+              <p class="eyebrow">Employee Archive</p>
+              <h2>员工档案</h2>
+              <p>统一维护员工基本信息和沟通状况，为风险研判、智能待办和管理助手提供基础数据。</p>
+            </div>
+            <label class="upload-btn">
+              <i data-lucide="file-up"></i>
+              <span>上传 Excel/CSV</span>
+              <input type="file" accept=".xlsx,.xls,.csv" data-employee-upload />
+            </label>
+          </div>
+
+          <section class="archive-grid">
+            <article class="panel archive-form-card">
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">Basic Info</p>
+                  <h2>员工基本信息</h2>
+                </div>
+              </div>
+              <form class="archive-form" data-employee-form>
+                <label><span>姓名</span><input name="name" required placeholder="例如：赵六" /></label>
+                <label><span>工号</span><input name="employeeId" placeholder="例如：E2026012" /></label>
+                <label><span>部门</span><input name="department" placeholder="例如：研发部" /></label>
+                <label><span>职务</span><input name="role" required placeholder="例如：后端工程师 · P5" /></label>
+                <label><span>入职时间</span><input name="hireDate" type="date" /></label>
+                <label><span>直属主管</span><input name="manager" placeholder="例如：姚老师" /></label>
+                <button class="primary-btn" type="submit"><i data-lucide="plus"></i><span>新增员工</span></button>
+              </form>
+            </article>
+
+            <article class="panel archive-form-card">
+              <div class="panel-title">
+                <div>
+                  <p class="eyebrow">Communication</p>
+                  <h2>员工沟通状况</h2>
+                </div>
+              </div>
+              <form class="archive-form" data-communication-form>
+                <label><span>员工</span><select name="employee" data-communication-employee></select></label>
+                <label><span>沟通日期</span><input name="date" type="date" /></label>
+                <label><span>沟通类型</span><select name="type"><option>1 对 1</option><option>转正面谈</option><option>绩效沟通</option><option>合同续签</option></select></label>
+                <label class="wide"><span>沟通摘要</span><textarea name="summary" rows="3" placeholder="记录本次沟通重点、员工状态和阻塞点"></textarea></label>
+                <label class="wide"><span>后续动作</span><input name="action" placeholder="例如：两周后复盘目标进展" /></label>
+                <button class="primary-btn" type="submit"><i data-lucide="message-square-plus"></i><span>记录沟通</span></button>
+              </form>
+            </article>
+          </section>
+
+          <section class="archive-grid tables">
+            <article class="panel archive-table-card">
+              <div class="section-head">
+                <h2>员工基本信息库</h2>
+                <small data-employee-count>0 人</small>
+              </div>
+              <div class="archive-table" data-employee-table></div>
+            </article>
+
+            <article class="panel archive-table-card">
+              <div class="section-head">
+                <h2>沟通记录</h2>
+                <small data-communication-count>0 条</small>
+              </div>
+              <div class="archive-table" data-communication-table></div>
+            </article>
+          </section>
+        </section>
+      </main>
+    </div>
+
+    <div class="drawer-backdrop" data-drawer-backdrop></div>
+    <aside class="employee-drawer" data-employee-drawer aria-hidden="true">
+      <div class="drawer-head">
+        <div>
+          <p class="eyebrow">Employee 360</p>
+          <h2 data-drawer-name>张三</h2>
+          <span data-drawer-role>产品运营 · P6</span>
+        </div>
+        <button type="button" data-close-drawer aria-label="关闭员工画像"><i data-lucide="x"></i></button>
+      </div>
+      <div class="drawer-score">
+        <span>当前风险分</span>
+        <strong data-drawer-risk>86</strong>
+        <small data-drawer-level>高风险</small>
+      </div>
+      <section class="drawer-section">
+        <h3>AI 风险解释</h3>
+        <p data-drawer-reason>连续加班 5 天，绩效从 B+ 下滑到 C，30 天未进行 1 对 1 沟通。</p>
+      </section>
+      <section class="drawer-section">
+        <h3>关键证据</h3>
+        <div class="drawer-tags" data-drawer-evidence></div>
+      </section>
+      <section class="drawer-section drawer-grid">
+        <div><span>绩效信息</span><strong data-drawer-performance>B+ -> C</strong></div>
+        <div><span>考勤信息</span><strong data-drawer-attendance>加班 28h</strong></div>
+        <div><span>最近沟通</span><strong data-drawer-communication>30 天未沟通</strong></div>
+        <div><span>建议动作</span><strong data-drawer-action>安排 1 对 1</strong></div>
+      </section>
+      <section class="drawer-section">
+        <h3>生命周期</h3>
+        <p><strong data-drawer-lifecycle-stage>成长期</strong>：<span data-drawer-lifecycle-detail>重点关注目标承接、能力成长和稳定沟通节奏。</span></p>
+      </section>
+      <div class="drawer-actions">
+        <button type="button" data-drawer-outline><i data-lucide="wand-sparkles"></i><span>生成沟通提纲</span></button>
+      </div>
+    </aside>
+
+    <div class="outline-modal-backdrop" data-outline-modal-backdrop></div>
+    <section class="outline-modal panel" data-outline-modal aria-hidden="true">
+      <div class="panel-title">
+        <div>
+          <p class="eyebrow">Generated Outline</p>
+          <h2 data-outline-title>1 对 1 沟通提纲</h2>
+        </div>
+        <button class="icon-btn" type="button" data-close-outline aria-label="关闭沟通提纲"><i data-lucide="x"></i></button>
+      </div>
+      <div class="outline-meta"><span>生成状态</span><strong data-outline-source>等待生成</strong></div>
+      <ol class="outline-list" data-outline-output></ol>
+    </section>
+  </body>
+</html>

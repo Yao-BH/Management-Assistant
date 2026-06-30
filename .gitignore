@@ -1,0 +1,13 @@
+.env
+*.env
+!*.env.example
+
+__pycache__/
+*.py[cod]
+
+employee_agent.db
+*.sqlite
+*.sqlite3
+
+.DS_Store
+Thumbs.db
