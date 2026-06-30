@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>员工管理助手</title>
-    <link rel="stylesheet" href="./styles.css?v=40" />
+    <link rel="stylesheet" href="./styles.css?v=41" />
     <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script defer src="./app.js?v=40"></script>
+    <script defer src="./app.js?v=41"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -145,43 +145,51 @@
           </aside>
         </section>
 
-        <section class="lower-grid">
-          <section class="risk-table-section">
-            <div class="section-head">
-              <h2>重点关注员工</h2>
-              <button type="button" data-refresh-risk-list>刷新</button>
+        <section class="focus-workspace panel">
+          <div class="focus-head">
+            <div>
+              <p class="eyebrow">Today Focus</p>
+              <h2 data-brief-title>今日重点关注</h2>
+              <p data-brief-summary>团队整体稳定，当前重点关注 3 名员工。优先处理张三的绩效与压力沟通，并跟进王五转正、李四合同续签节点。</p>
             </div>
+            <div class="focus-actions">
+              <button class="select-btn" type="button" data-refresh-risk-list><i data-lucide="refresh-cw"></i><span>刷新</span></button>
+              <button class="primary-btn" type="button" data-generate-brief><i data-lucide="sparkles"></i><span>生成研判</span></button>
+            </div>
+          </div>
 
-            <div class="risk-table" data-risk-table>
-              <div class="table-head">
-                <span>员工</span>
-                <span>优先级</span>
-                <span>风险依据</span>
-                <span>下一步动作</span>
-                <span>状态</span>
+          <div class="focus-grid">
+            <section class="risk-table-section">
+              <div class="section-head compact">
+                <h2>关注队列</h2>
+                <small>点击员工查看判断与动作</small>
               </div>
 
-              <div class="person-row loading-row">
-                <span class="person"><b>AI</b><em>正在生成</em></span>
-                <span>分析中</span>
-                <span>读取风险、节点和沟通逾期信息</span>
-                <span>生成下一步动作</span>
-                <span class="status-pill">待处理</span>
-              </div>
-            </div>
-          </section>
+              <div class="risk-table" data-risk-table>
+                <div class="table-head">
+                  <span>员工</span>
+                  <span>风险依据</span>
+                  <span>建议动作</span>
+                  <span>状态</span>
+                </div>
 
-          <section class="brief-panel panel">
-            <div class="panel-title">
-              <div>
-                <p class="eyebrow">AI Management Brief</p>
-                <h2 data-brief-title>今日管理研判</h2>
+                <div class="person-row loading-row">
+                  <span class="person"><b>AI</b><em>正在生成</em></span>
+                  <span>读取风险、节点和沟通逾期信息</span>
+                  <span>生成下一步动作</span>
+                  <span class="status-pill">待处理</span>
+                </div>
               </div>
-              <button class="primary-btn" type="button" data-generate-brief><i data-lucide="sparkles"></i><span>生成简报</span></button>
-            </div>
-            <p data-brief-summary>团队整体稳定，当前重点关注 3 名员工。优先处理张三的绩效与压力沟通，并跟进王五转正、李四合同续签节点。</p>
-            <div class="brief-insights" data-brief-insights></div>
-          </section>
+            </section>
+
+            <aside class="focus-detail" data-focus-detail>
+              <div class="empty-detail">
+                <i data-lucide="mouse-pointer-click"></i>
+                <h2>选择一名员工</h2>
+                <p>这里会合并展示管理研判、风险依据和下一步动作。</p>
+              </div>
+            </aside>
+          </div>
         </section>
         </section>
 

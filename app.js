@@ -126,6 +126,8 @@ let communicationRecords = [
 
 let smartTodos = [...fallbackTodos];
 let selectedTodoId = "";
+let selectedFocusId = "";
+let currentBrief = fallbackBrief;
 
 function initIcons() {
   if (window.lucide) window.lucide.createIcons();
@@ -332,15 +334,20 @@ async function loadMetrics() {
 }
 
 function renderBrief(brief) {
-  document.querySelector("[data-brief-title]").textContent = brief.title || fallbackBrief.title;
-  document.querySelector("[data-brief-summary]").textContent = brief.summary || fallbackBrief.summary;
+  currentBrief = { ...fallbackBrief, ...brief };
+  const briefTitle = document.querySelector("[data-brief-title]");
+  briefTitle.textContent = String(currentBrief.title || "").includes("正在") ? "正在生成今日重点关注..." : "今日重点关注";
+  document.querySelector("[data-brief-summary]").textContent = currentBrief.summary || fallbackBrief.summary;
   const insights = document.querySelector("[data-brief-insights]");
-  insights.innerHTML = "";
-  (brief.insights || fallbackBrief.insights).slice(0, 3).forEach((item) => {
-    const card = document.createElement("div");
-    card.innerHTML = `<span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong><small>${escapeHtml(item.detail)}</small>`;
-    insights.appendChild(card);
-  });
+  if (insights) {
+    insights.innerHTML = "";
+    (currentBrief.insights || fallbackBrief.insights).slice(0, 3).forEach((item) => {
+      const card = document.createElement("div");
+      card.innerHTML = `<span>${escapeHtml(item.label)}</span><strong>${escapeHtml(item.value)}</strong><small>${escapeHtml(item.detail)}</small>`;
+      insights.appendChild(card);
+    });
+  }
+  renderFocusDetail(todoById(selectedFocusId) || smartTodos[0]);
 }
 
 async function loadBrief() {
@@ -443,17 +450,81 @@ function todoStatus(item) {
   return "待处理";
 }
 
+function selectedFocusItem(items = smartTodos) {
+  if (!selectedFocusId && items.length) selectedFocusId = items[0].id;
+  if (selectedFocusId && !items.some((item) => item.id === selectedFocusId)) selectedFocusId = items[0]?.id || "";
+  return items.find((item) => item.id === selectedFocusId) || items[0];
+}
+
+function renderFocusDetail(item) {
+  const detail = document.querySelector("[data-focus-detail]");
+  if (!detail) return;
+  if (!item) {
+    detail.innerHTML = `<div class="empty-detail"><i data-lucide="check-circle-2"></i><h2>暂无重点风险</h2><p>补充员工档案和沟通记录后，系统会在这里生成关注对象。</p></div>`;
+    initIcons();
+    return;
+  }
+  const employeeKey = employees[item.employeeKey] ? item.employeeKey : Object.keys(employees)[0];
+  const employee = employees[employeeKey] || {};
+  const profile = profileFallbacks[employeeKey] || {};
+  const insights = (currentBrief.insights || fallbackBrief.insights).slice(0, 2);
+  detail.innerHTML = `
+    <div class="focus-detail-hero ${escapeHtml(item.level || "medium")}">
+      <span>${escapeHtml(item.priority || "P-")}</span>
+      <div>
+        <strong>${escapeHtml(employee.name || item.employeeKey || "未关联员工")}</strong>
+        <small>${escapeHtml(employee.role || "员工画像待补充")}</small>
+      </div>
+      <em>${escapeHtml(todoStatus(item))}</em>
+    </div>
+    <section class="focus-brief-card">
+      <span>管理判断</span>
+      <p>${escapeHtml(item.summary || profile.riskSummary || employee.reason || "暂无足够数据，请补充沟通记录后分析。")}</p>
+    </section>
+    <section class="focus-mini-grid">
+      <div><span>风险等级</span><strong>${escapeHtml(todoLevelLabel(item.level))}</strong></div>
+      <div><span>当前风险分</span><strong>${escapeHtml(employee.risk || "--")}</strong></div>
+    </section>
+    <section class="focus-evidence">
+      <span>风险依据</span>
+      <div>${(item.tags || employee.evidence || []).slice(0, 4).map((tag) => `<b>${escapeHtml(tag)}</b>`).join("") || "<b>待补充</b>"}</div>
+    </section>
+    <section class="focus-brief-card">
+      <span>下一步动作</span>
+      <p>${escapeHtml(item.title || profile.suggestedAction || employee.goal || "安排一次 1 对 1 沟通。")}</p>
+    </section>
+    <div class="focus-insights">
+      ${insights.map((insight) => `<div><span>${escapeHtml(insight.label)}</span><strong>${escapeHtml(insight.value)}</strong></div>`).join("")}
+    </div>
+    <div class="focus-detail-actions">
+      <button type="button" data-focus-open="${escapeHtml(employeeKey)}"><i data-lucide="panel-right-open"></i><span>查看画像</span></button>
+      <button type="button" data-focus-outline="${escapeHtml(employeeKey)}"><i data-lucide="wand-sparkles"></i><span>生成提纲</span></button>
+      <button type="button" data-focus-workbench><i data-lucide="clipboard-list"></i><span>进入待办</span></button>
+    </div>
+  `;
+  detail.querySelector("[data-focus-open]")?.addEventListener("click", (event) => openEmployeeDrawer(event.currentTarget.dataset.focusOpen, item.id));
+  detail.querySelector("[data-focus-outline]")?.addEventListener("click", (event) => generateOutlineInModal(event.currentTarget.dataset.focusOutline));
+  detail.querySelector("[data-focus-workbench]")?.addEventListener("click", () => {
+    selectedTodoId = item.id;
+    showView("todo-workbench");
+    document.querySelectorAll(".nav-item").forEach((button) => button.classList.toggle("active", button.dataset.viewTarget === "todo-workbench"));
+  });
+  initIcons();
+}
+
 function renderRiskTable(items) {
   const table = document.querySelector("[data-risk-table]");
   const header = table.querySelector(".table-head");
   table.innerHTML = "";
   table.appendChild(header);
   const source = (items && items.length ? items : smartTodos).slice(0, 5);
+  selectedFocusItem(source);
   if (!source.length) {
     const row = document.createElement("div");
     row.className = "person-row loading-row";
-    row.innerHTML = `<span class="person"><b>AI</b><em>暂无待办</em></span><span>-</span><span>当前没有重点风险项</span><span>可先补充沟通记录并运行 AI 分析</span><span class="status-pill">稳定</span>`;
+    row.innerHTML = `<span class="person"><b>AI</b><em>暂无待办</em></span><span>当前没有重点风险项</span><span>可先补充沟通记录并运行 AI 分析</span><span class="status-pill">稳定</span>`;
     table.appendChild(row);
+    renderFocusDetail(null);
     return;
   }
   source.forEach((item) => {
@@ -461,13 +532,17 @@ function renderRiskTable(items) {
     if (!employeeKey) return;
     const employee = employees[employeeKey];
     const row = document.createElement("button");
-    row.className = "person-row";
+    row.className = `person-row ${item.id === selectedFocusId ? "selected" : ""}`;
     row.type = "button";
     row.dataset.openEmployee = employeeKey;
-    row.innerHTML = `<span class="person"><b>${escapeHtml(employee.name.slice(0, 1))}</b><em>${escapeHtml(employee.name)}</em></span><span class="risk-dots ${escapeHtml(item.level || "medium")}">${dotsForLevel(item.level)}</span><span>${escapeHtml((item.tags || []).slice(0, 2).join("、") || item.summary || employee.reason)}</span><span>${escapeHtml(item.title || employee.goal)}</span><span class="status-pill ${escapeHtml(item.level || "medium")}">${escapeHtml(todoStatus(item))}</span>`;
-    row.addEventListener("click", () => openEmployeeDrawer(employeeKey));
+    row.innerHTML = `<span class="person"><b>${escapeHtml(employee.name.slice(0, 1))}</b><em>${escapeHtml(employee.name)}</em><small>${escapeHtml(item.priority || todoLevelLabel(item.level))}</small></span><span>${escapeHtml((item.tags || []).slice(0, 2).join("、") || item.summary || employee.reason)}</span><span>${escapeHtml(item.title || employee.goal)}</span><span class="status-pill ${escapeHtml(item.level || "medium")}">${escapeHtml(todoStatus(item))}</span>`;
+    row.addEventListener("click", () => {
+      selectedFocusId = item.id;
+      renderRiskTable(source);
+    });
     table.appendChild(row);
   });
+  renderFocusDetail(selectedFocusItem(source));
 }
 
 function statusClass(status = "待处理") {
