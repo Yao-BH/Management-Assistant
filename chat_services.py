@@ -242,16 +242,10 @@ def generate_chat_reply(message, history=None, intent=None):
     context = build_team_context()
     resolved_intent = infer_intent(message, intent)
     card = build_reply_card(message, context, resolved_intent)
-    if resolved_intent != "general":
-        return {
-            "reply": local_reply_for_intent(message, context, resolved_intent),
-            "source": "Agent 工具路由",
-            "intent": resolved_intent,
-            "card": card,
-            "actions": suggest_actions(message, context),
-        }
-
-    intent_hint = f"用户意图：{resolved_intent}。"
+    intent_hint = (
+        f"系统初步识别的用户意图：{resolved_intent}。"
+        "这只是辅助判断，不要机械套模板；请优先理解用户原话并自然回答。"
+    )
     messages = [
         {"role": "system", "content": CHAT_SYSTEM_PROMPT},
         {"role": "user", "content": intent_hint + "团队上下文：" + json.dumps(context, ensure_ascii=False)},

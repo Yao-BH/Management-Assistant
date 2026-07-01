@@ -881,6 +881,11 @@ async function openEmployeeDrawer(employeeKey, todoId = "", options = {}) {
   document.querySelector("[data-drawer-name]").textContent = employee.name;
   document.querySelector("[data-drawer-role]").textContent = employee.role;
   document.querySelector("[data-drawer-level]").textContent = employee.level;
+  const scoreBox = document.querySelector(".drawer-score");
+  if (scoreBox) {
+    scoreBox.classList.remove("high", "medium", "low", "normal");
+    scoreBox.classList.add(riskClass(employee));
+  }
   document.querySelector("[data-drawer-save-edits]")?.toggleAttribute("hidden", !editable);
   document.querySelector("[data-drawer-analyze]")?.toggleAttribute("hidden", !editable);
   renderEmployeeProfile(employeeKey, profileFallbacks[employeeKey]);
