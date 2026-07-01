@@ -21,6 +21,8 @@ let selectedTodoId = "";
 let selectedFocusId = "";
 let currentBrief = emptyBrief;
 let pendingEmployeeEdits = {};
+let agentEvents = [];
+let agentFeedSignature = "";
 
 function initIcons() {
   if (window.lucide) window.lucide.createIcons();
@@ -89,6 +91,83 @@ function signalText(signal) {
   return value && value !== label ? `${label}：${value}` : label;
 }
 
+function formatEventTime(date = new Date()) {
+  return date.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+}
+
+function employeeNameByKey(employeeKey) {
+  return employees[employeeKey]?.name || archiveEmployees.find((employee) => employee.key === employeeKey)?.name || "重点员工";
+}
+
+function renderAgentFeed() {
+  const feed = document.querySelector("[data-agent-feed]");
+  if (!feed) return;
+  const teamCount = archiveEmployees.length;
+  const focusQueue = buildFocusQueue();
+  const focusCount = focusQueue.length;
+  const topFocus = focusQueue[0];
+  const topName = topFocus ? employeeNameByKey(topFocus.employeeKey) : "暂无";
+  const latestSignal = riskSignals[0];
+  const latestText = latestSignal ? `${employeeNameByKey(latestSignal.employeeKey)} · ${signalText(latestSignal)}` : "未发现新的高强度信号";
+  const nextAction = topFocus?.title || "保持常规沟通节奏";
+  const latestEvent = agentEvents[0]?.text || `已同步 ${smartTodos.length} 条管理待办。`;
+  feed.innerHTML = `
+    <div class="agent-status-item scan"><b>扫描</b><span>${escapeHtml(teamCount)} 名员工</span></div>
+    <div class="agent-status-item found"><b>发现</b><span>${escapeHtml(focusCount)} 个关注对象 · ${escapeHtml(latestText)}</span></div>
+    <div class="agent-status-item next"><b>建议</b><span>${escapeHtml(topName)}：${escapeHtml(nextAction)}</span></div>
+    <div class="agent-status-ticker"><time>${escapeHtml(formatEventTime())}</time><span>${escapeHtml(latestEvent)}</span></div>
+  `;
+}
+
+function pushAgentEvent(text) {
+  if (!text) return;
+  agentEvents = [{ time: formatEventTime(), text }, ...agentEvents].slice(0, 8);
+  renderAgentFeed();
+}
+
+function buildAgentSnapshotEvents() {
+  const teamCount = archiveEmployees.length;
+  const focusCount = archiveEmployees.filter(shouldShowInFocus).length;
+  const todoCount = smartTodos.length;
+  const events = [
+    { time: formatEventTime(), text: `扫描 ${teamCount} 名员工，发现 ${focusCount} 个重点关注对象。` },
+  ];
+  const signalItems = riskSignals.slice(0, 2);
+  signalItems.forEach((signal) => {
+    events.push({
+      time: formatEventTime(),
+      text: `识别到${employeeNameByKey(signal.employeeKey)}：${signalText(signal)}。`,
+    });
+  });
+  if (!signalItems.length) {
+    const topFocus = buildFocusQueue()[0];
+    if (topFocus) events.push({ time: formatEventTime(), text: `当前优先关注${employeeNameByKey(topFocus.employeeKey)}，建议推进管理动作。` });
+  }
+  events.push({ time: formatEventTime(), text: `已同步 ${todoCount} 条管理待办。` });
+  return events.slice(0, 5);
+}
+
+function updateAgentFeedFromState(reason = "已同步最新管理数据。") {
+  const signature = JSON.stringify({
+    team: archiveEmployees.length,
+    focus: archiveEmployees.filter(shouldShowInFocus).length,
+    todos: smartTodos.map((todo) => `${todo.id}:${todo.status}`).join("|"),
+    signals: riskSignals.map((signal) => `${signal.id}:${signal.status}`).join("|"),
+  });
+  if (!agentFeedSignature) {
+    agentFeedSignature = signature;
+    agentEvents = buildAgentSnapshotEvents();
+    renderAgentFeed();
+    return;
+  }
+  if (signature !== agentFeedSignature) {
+    agentFeedSignature = signature;
+    pushAgentEvent(reason);
+    const latestSignal = riskSignals[0];
+    if (latestSignal) pushAgentEvent(`刷新风险证据：${employeeNameByKey(latestSignal.employeeKey)} · ${signalText(latestSignal)}。`);
+  }
+}
+
 function syncEmployeesFromArchive(list = archiveEmployees) {
   Object.keys(employees).forEach((key) => delete employees[key]);
   list.forEach((employee) => {
@@ -154,6 +233,7 @@ function applyArchivePayload(payload = {}) {
   renderMetrics(payload.metrics || deriveDashboardMetrics());
   renderRiskTable(smartTodos);
   renderTodoWorkbench();
+  updateAgentFeedFromState("AI 已根据最新数据刷新风险、待办和关注队列。");
 }
 
 async function loadArchive() {
@@ -317,6 +397,7 @@ async function submitChat(message, intent = "") {
     const result = await postJson("/api/chat", { message, intent, history: assistantHistory });
     thinking.remove();
     addChatBubble(result.reply || "建议优先查看风险画像，并生成 1 对 1 沟通提纲。", "assistant", result.actions || [], result.card || null);
+    pushAgentEvent(`Agent 已识别“${intent || result.intent || "团队问答"}”意图并完成回复。`);
     assistantHistory.push({ role: "user", content: message });
     assistantHistory.push({ role: "assistant", content: result.reply || "" });
   } catch {
@@ -566,6 +647,7 @@ function renderTodoDetail(item) {
   }
   const employee = employees[item.employeeKey] || {};
   const records = communicationRecords.filter((record) => record.employeeKey === item.employeeKey || record.employee === employee.name).slice(0, 3);
+  const nextBestAction = item.title || employee.suggestedAction || employee.goal || "安排一次状态确认，并记录下一步跟进动作。";
   panel.innerHTML = `
     <div class="todo-detail-head">
       <div>
@@ -583,6 +665,11 @@ function renderTodoDetail(item) {
       <h3>风险依据</h3>
       <p>${escapeHtml(item.summary || employee.reason || "暂无风险摘要")}</p>
       <div class="drawer-tags">${(item.tags || []).map((tag) => `<span>${escapeHtml(tag)}</span>`).join("")}</div>
+    </section>
+    <section class="todo-glass-section next-action-section">
+      <h3>下一步最佳动作</h3>
+      <p>${escapeHtml(nextBestAction)}</p>
+      <small>${escapeHtml(employee.name || "该员工")}当前处于${escapeHtml(todoLevelLabel(item.level))}，建议先完成这一步再复评风险。</small>
     </section>
     <section class="todo-glass-section">
       <h3>最近沟通</h3>
@@ -641,6 +728,7 @@ async function loadRiskTable() {
     smartTodos = result.items || smartTodos;
     renderRiskTable(smartTodos);
     renderTodoWorkbench();
+    updateAgentFeedFromState("AI 已重新编排智能待办和关注队列。");
     loadMetrics();
   } catch {
     renderRiskTable(smartTodos);
@@ -838,6 +926,15 @@ function openEmployeeModal() {
 
 function closeEmployeeModal() {
   document.querySelector("[data-employee-modal]")?.setAttribute("aria-hidden", "true");
+}
+
+function openCommunicationModal() {
+  document.querySelector("[data-communication-modal]")?.setAttribute("aria-hidden", "false");
+  initIcons();
+}
+
+function closeCommunicationModal() {
+  document.querySelector("[data-communication-modal]")?.setAttribute("aria-hidden", "true");
 }
 
 async function generateOutlineInModal(employeeKey) {
@@ -1260,6 +1357,7 @@ function activateArchive() {
     try {
       const result = await postJson("/api/communication", { record });
       event.currentTarget.reset();
+      closeCommunicationModal();
       if (result.archive) applyArchivePayload(result.archive);
       await loadArchive();
     } catch {
@@ -1276,9 +1374,13 @@ function activateArchive() {
     event.target.value = "";
   });
   document.querySelector("[data-open-employee-modal]")?.addEventListener("click", openEmployeeModal);
+  document.querySelector("[data-open-communication-modal]")?.addEventListener("click", openCommunicationModal);
   document.querySelector("[data-save-employee-edits]")?.addEventListener("click", savePendingEmployeeChanges);
   document.querySelectorAll("[data-close-employee-modal]").forEach((button) => {
     button.addEventListener("click", closeEmployeeModal);
+  });
+  document.querySelectorAll("[data-close-communication-modal]").forEach((button) => {
+    button.addEventListener("click", closeCommunicationModal);
   });
 }
 
@@ -1328,6 +1430,7 @@ function activateUi() {
       closeEmployeeDrawer();
       closeOutlineModal();
       closeEmployeeModal();
+      closeCommunicationModal();
     }
   });
 }

@@ -4,10 +4,10 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>员工管理助手</title>
-    <link rel="stylesheet" href="./styles.css?v=44" />
+    <link rel="stylesheet" href="./styles.css?v=45" />
     <script defer src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-    <script defer src="./app.js?v=44"></script>
+    <script defer src="./app.js?v=45"></script>
   </head>
   <body>
     <div class="app-shell">
@@ -47,7 +47,18 @@
         <header class="topbar">
           <h1>Analytical board</h1>
           <div class="top-actions">
-            <button class="select-btn" type="button">Chart: Funnel <i data-lucide="chevron-down"></i></button>
+            <section class="agent-feed" aria-label="AI 动态">
+              <div class="agent-feed-head">
+                <i data-lucide="sparkles"></i>
+                <span>AI 动态</span>
+              </div>
+              <div class="agent-feed-list" data-agent-feed>
+                <div class="agent-status-item scan"><b>扫描</b><span>读取团队风险信号</span></div>
+                <div class="agent-status-item found"><b>发现</b><span>同步关注对象</span></div>
+                <div class="agent-status-item next"><b>建议</b><span>生成下一步动作</span></div>
+                <div class="agent-status-ticker"><time>--:--</time><span>等待 AI 同步团队数据...</span></div>
+              </div>
+            </section>
             <label class="search">
               <i data-lucide="search"></i>
               <input type="search" placeholder="搜索员工、风险、待办" />
@@ -273,21 +284,33 @@
           </section>
 
           <section class="archive-tab-panel" data-archive-panel="communication" hidden>
-            <article class="panel archive-form-card">
+            <article class="panel archive-form-card archive-toolbar-card">
               <div class="panel-title">
                 <div>
                   <p class="eyebrow">Communication</p>
                   <h2>员工沟通状况</h2>
                 </div>
+                <button class="primary-btn" type="button" data-open-communication-modal><i data-lucide="message-square-plus"></i><span>新增沟通记录</span></button>
               </div>
-              <form class="archive-form" data-communication-form>
+            </article>
+
+            <div class="form-modal" data-communication-modal aria-hidden="true">
+              <div class="modal-backdrop" data-close-communication-modal></div>
+              <form class="archive-form form-modal-panel" data-communication-form>
+                <div class="modal-head">
+                  <div>
+                    <p class="eyebrow">New Communication</p>
+                    <h2>新增沟通记录</h2>
+                  </div>
+                  <button type="button" data-close-communication-modal aria-label="关闭新增沟通"><i data-lucide="x"></i></button>
+                </div>
                 <label><span>员工姓名</span><input name="employee" list="employee-name-options" data-communication-employee required placeholder="输入姓名，支持下拉提醒" /></label>
                 <datalist id="employee-name-options" data-employee-name-options></datalist>
                 <label><span>沟通日期</span><input name="date" type="date" /></label>
                 <label class="wide"><span>沟通摘要</span><textarea name="summary" rows="3" placeholder="记录本次沟通重点、员工状态和阻塞点"></textarea></label>
                 <button class="primary-btn" type="submit"><i data-lucide="message-square-plus"></i><span>记录沟通</span></button>
               </form>
-            </article>
+            </div>
 
             <article class="panel archive-table-card">
               <div class="section-head">

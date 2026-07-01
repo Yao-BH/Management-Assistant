@@ -14,6 +14,8 @@ def infer_intent(message, explicit_intent=None):
         return "capability_query"
     if any(word in text for word in ("团队", "整体", "概况", "总览", "多少人", "人数")):
         return "team_summary"
+    if any(word in text for word in ("所有", "全部", "全员", "每个")) and any(word in text for word in ("风险", "状态", "员工")):
+        return "risk_overview"
     if "优先" in text or "先处理" in text or "今天" in text or "关注谁" in text:
         return "today_priority"
     if "为什么" in text or "原因" in text or "风险" in text:
@@ -107,6 +109,17 @@ def format_risk_reason(message, context):
     )
 
 
+def format_risk_overview(context):
+    focus = focus_employees(context)
+    if not focus:
+        return "当前没有识别出高风险或中风险员工。\n建议继续补充沟通记录和关键节点信息。"
+    lines = []
+    for employee in focus[:6]:
+        evidence = "、".join(evidence_labels(employee)[:2]) or employee.get("reason") or "证据不足"
+        lines.append(f"{len(lines) + 1}. {employee['name']}：{employee.get('level', '待分析')}；{evidence}")
+    return "当前风险员工概览：\n" + "\n".join(lines)
+
+
 def format_management_actions(message, context):
     focus = focus_employees(context)
     employee = select_employee(message, context) or (focus[0] if focus else None)
@@ -130,6 +143,8 @@ def local_reply_for_intent(message, context, intent):
         return format_today_priority(context)
     if intent == "risk_reason":
         return format_risk_reason(message, context)
+    if intent == "risk_overview":
+        return format_risk_overview(context)
     if intent in ("management_actions", "create_todo"):
         return format_management_actions(message, context)
     if intent == "communication_outline":
