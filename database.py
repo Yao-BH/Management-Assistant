@@ -82,9 +82,29 @@ def init_db():
                 source TEXT DEFAULT 'system',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP
             );
+
+            CREATE TABLE IF NOT EXISTS risk_signals (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                employee_key TEXT NOT NULL,
+                signal_type TEXT NOT NULL,
+                signal_label TEXT,
+                signal_value TEXT,
+                score_delta INTEGER DEFAULT 0,
+                severity TEXT DEFAULT 'low',
+                confidence INTEGER DEFAULT 100,
+                source TEXT DEFAULT 'rule',
+                source_ref_type TEXT DEFAULT '',
+                source_ref_id TEXT DEFAULT '',
+                status TEXT DEFAULT 'active',
+                first_seen_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                resolved_at TEXT,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
+            );
             """
         )
         ensure_employee_columns(db)
+        ensure_risk_signal_columns(db)
 
 
 def ensure_employee_columns(db):
@@ -114,12 +134,69 @@ def ensure_employee_columns(db):
             db.execute(sql)
 
 
+def ensure_risk_signal_columns(db):
+    columns = {row["name"] for row in db.execute("PRAGMA table_info(risk_signals)").fetchall()}
+    migrations = {
+        "signal_label": "ALTER TABLE risk_signals ADD COLUMN signal_label TEXT",
+        "confidence": "ALTER TABLE risk_signals ADD COLUMN confidence INTEGER DEFAULT 100",
+        "source_ref_type": "ALTER TABLE risk_signals ADD COLUMN source_ref_type TEXT DEFAULT ''",
+        "source_ref_id": "ALTER TABLE risk_signals ADD COLUMN source_ref_id TEXT DEFAULT ''",
+        "status": "ALTER TABLE risk_signals ADD COLUMN status TEXT DEFAULT 'active'",
+        "first_seen_at": "ALTER TABLE risk_signals ADD COLUMN first_seen_at TEXT DEFAULT CURRENT_TIMESTAMP",
+        "last_seen_at": "ALTER TABLE risk_signals ADD COLUMN last_seen_at TEXT DEFAULT CURRENT_TIMESTAMP",
+        "resolved_at": "ALTER TABLE risk_signals ADD COLUMN resolved_at TEXT",
+    }
+    for column, sql in migrations.items():
+        if column not in columns:
+            db.execute(sql)
+
+
 def slugify_name(name):
     mapping = {"张三": "zhangsan", "李四": "lisi", "王五": "wangwu"}
     return mapping.get(name, str(name).strip().lower().replace(" ", "-") or f"employee-{date.today().isoformat()}")
 
 
-def row_to_employee(row):
+def list_risk_signals(employee_key=None, status="active"):
+    with connect() as db:
+        status_clause = "AND status = ?" if status else ""
+        if employee_key:
+            rows = db.execute(
+                f"SELECT * FROM risk_signals WHERE employee_key = ? {status_clause} ORDER BY score_delta DESC, id DESC",
+                (employee_key, status) if status else (employee_key,),
+            ).fetchall()
+        else:
+            rows = db.execute(
+                f"SELECT * FROM risk_signals WHERE 1 = 1 {status_clause} ORDER BY created_at DESC, score_delta DESC, id DESC",
+                (status,) if status else (),
+            ).fetchall()
+    return [row_to_risk_signal(row) for row in rows]
+
+
+def row_to_risk_signal(row):
+    return {
+        "id": row["id"],
+        "employeeKey": row["employee_key"] or "",
+        "type": row["signal_type"] or "",
+        "label": row["signal_label"] or row["signal_type"] or "",
+        "value": row["signal_value"] or "",
+        "scoreDelta": row["score_delta"] or 0,
+        "severity": row["severity"] or "low",
+        "confidence": row["confidence"] if row["confidence"] is not None else 100,
+        "source": row["source"] or "rule",
+        "sourceRefType": row["source_ref_type"] or "",
+        "sourceRefId": row["source_ref_id"] or "",
+        "status": row["status"] or "active",
+        "firstSeenAt": row["first_seen_at"] or "",
+        "lastSeenAt": row["last_seen_at"] or "",
+        "resolvedAt": row["resolved_at"] or "",
+        "createdAt": row["created_at"] or "",
+    }
+
+
+def row_to_employee(row, risk_signals=None):
+    risk_signals = risk_signals if risk_signals is not None else list_risk_signals(row["key"])
+    signal_labels = [signal["label"] for signal in risk_signals if signal.get("label")]
+    stored_evidence = json.loads(row["evidence_json"] or "[]")
     return {
         "key": row["key"],
         "name": row["name"],
@@ -145,8 +222,9 @@ def row_to_employee(row):
         "risk": row["risk"] or 0,
         "level": row["level"] or "待分析",
         "reason": row["reason"] or "",
-        "evidence": json.loads(row["evidence_json"] or "[]"),
-        "riskFactors": json.loads(row["risk_factors_json"] or "[]"),
+        "evidence": signal_labels or stored_evidence,
+        "riskSignals": risk_signals,
+        "riskFactors": signal_labels or json.loads(row["risk_factors_json"] or "[]"),
         "goal": row["goal"] or "",
         "lifecycle": {
             "stage": row["lifecycle_stage"] or "待分析",
@@ -192,19 +270,26 @@ def row_to_todo(row):
 def list_employees():
     with connect() as db:
         rows = db.execute("SELECT * FROM employees ORDER BY updated_at DESC, name").fetchall()
-        return [row_to_employee(row) for row in rows]
+        signal_rows = db.execute(
+            "SELECT * FROM risk_signals WHERE status = 'active' ORDER BY score_delta DESC, id DESC"
+        ).fetchall()
+    grouped_signals = {}
+    for signal in signal_rows:
+        item = row_to_risk_signal(signal)
+        grouped_signals.setdefault(item["employeeKey"], []).append(item)
+    return [row_to_employee(row, grouped_signals.get(row["key"], [])) for row in rows]
 
 
 def get_employee(key):
     with connect() as db:
         row = db.execute("SELECT * FROM employees WHERE key = ?", (key,)).fetchone()
-        return row_to_employee(row) if row else None
+    return row_to_employee(row) if row else None
 
 
 def get_employee_by_name(name):
     with connect() as db:
         row = db.execute("SELECT * FROM employees WHERE name = ?", (name,)).fetchone()
-        return row_to_employee(row) if row else None
+    return row_to_employee(row) if row else None
 
 
 def get_employee_by_id(employee_id):
@@ -212,7 +297,7 @@ def get_employee_by_id(employee_id):
         return None
     with connect() as db:
         row = db.execute("SELECT * FROM employees WHERE employee_id = ?", (employee_id,)).fetchone()
-        return row_to_employee(row) if row else None
+    return row_to_employee(row) if row else None
 
 
 def delete_employee(employee_key):
@@ -223,8 +308,44 @@ def delete_employee(employee_key):
         employee = row_to_employee(row)
         db.execute("DELETE FROM todos WHERE employee_key = ?", (employee_key,))
         db.execute("DELETE FROM communication_records WHERE employee_key = ?", (employee_key,))
+        db.execute("DELETE FROM risk_signals WHERE employee_key = ?", (employee_key,))
         db.execute("DELETE FROM employees WHERE key = ?", (employee_key,))
         return employee
+
+
+def replace_risk_signals(db, employee_key, signals):
+    db.execute(
+        """
+        UPDATE risk_signals
+        SET status = 'expired',
+            resolved_at = CURRENT_TIMESTAMP,
+            last_seen_at = CURRENT_TIMESTAMP
+        WHERE employee_key = ? AND status = 'active'
+        """,
+        (employee_key,),
+    )
+    for signal in signals:
+        db.execute(
+            """
+            INSERT INTO risk_signals (
+                employee_key, signal_type, signal_label, signal_value, score_delta,
+                severity, confidence, source, source_ref_type, source_ref_id, status,
+                first_seen_at, last_seen_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'active', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            """,
+            (
+                employee_key,
+                signal.get("type") or signal.get("label") or "",
+                signal.get("label") or signal.get("type") or "",
+                signal.get("value", ""),
+                int(signal.get("scoreDelta") or signal.get("score_delta") or 0),
+                signal.get("severity", "low"),
+                int(signal.get("confidence", 100)),
+                signal.get("source", "rule"),
+                signal.get("sourceRefType") or signal.get("source_ref_type") or "",
+                str(signal.get("sourceRefId") or signal.get("source_ref_id") or ""),
+            ),
+        )
 
 
 def upsert_employee(employee):
@@ -316,6 +437,8 @@ def upsert_employee(employee):
 
 def save_rule_analysis(employee_key, profile, model_required=True):
     with connect() as db:
+        signals = profile.get("riskSignals") or []
+        replace_risk_signals(db, employee_key, signals)
         db.execute(
             """
             UPDATE employees SET

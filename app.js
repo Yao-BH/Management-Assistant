@@ -16,6 +16,7 @@ const emptyBrief = {
 let archiveEmployees = [];
 let communicationRecords = [];
 let smartTodos = [];
+let riskSignals = [];
 let selectedTodoId = "";
 let selectedFocusId = "";
 let currentBrief = emptyBrief;
@@ -81,6 +82,13 @@ async function postJson(url, payload = {}) {
   return response.json();
 }
 
+function signalText(signal) {
+  if (!signal) return "";
+  const label = signal.label || signal.type || "";
+  const value = signal.value || "";
+  return value && value !== label ? `${label}：${value}` : label;
+}
+
 function syncEmployeesFromArchive(list = archiveEmployees) {
   Object.keys(employees).forEach((key) => delete employees[key]);
   list.forEach((employee) => {
@@ -110,6 +118,8 @@ function syncEmployeesFromArchive(list = archiveEmployees) {
       level: employee.level || "待分析",
       reason: employee.reason || "",
       evidence: employee.evidence || [],
+      riskSignals: employee.riskSignals || [],
+      riskFactors: employee.riskFactors || [],
       goal: employee.goal || employee.suggestedAction || "",
       lifecycle: employee.lifecycle || { stage: employee.lifecycleStage || "待分析", detail: employee.lifecycleDetail || "" },
       performance: employee.performance || "待分析",
@@ -120,7 +130,9 @@ function syncEmployeesFromArchive(list = archiveEmployees) {
     };
     profileFallbacks[employee.key] = {
       riskSummary: employee.reason || "当前员工缺少足够分析数据，建议补充沟通记录后运行 AI 分析。",
-      evidence: employee.evidence || [],
+      evidence: (employee.riskSignals || []).map(signalText).filter(Boolean).length
+        ? (employee.riskSignals || []).map(signalText).filter(Boolean)
+        : employee.evidence || [],
       performance: employee.performance || "待分析",
       attendance: employee.attendance || "待分析",
       communication: employee.communication || "待分析",
@@ -136,6 +148,7 @@ function applyArchivePayload(payload = {}) {
   archiveEmployees = payload.employees || archiveEmployees;
   communicationRecords = payload.communicationRecords || communicationRecords;
   smartTodos = payload.todos || smartTodos;
+  riskSignals = payload.riskSignals || riskSignals;
   syncEmployeesFromArchive(archiveEmployees);
   renderArchive();
   renderMetrics(payload.metrics || deriveDashboardMetrics());
@@ -288,6 +301,17 @@ function renderAssistantActions(actions = []) {
   return `<div class="assistant-actions">${actions.map((action) => `<button type="button" data-agent-action="${escapeHtml(action.type)}" data-agent-employee="${escapeHtml(action.employeeKey || "")}">${escapeHtml(action.label)}</button>`).join("")}</div>`;
 }
 
+function renderAssistantCard(card) {
+  if (!card) return "";
+  const evidence = (card.evidence || []).slice(0, 4);
+  return `<article class="assistant-card ${escapeHtml(card.tone || "medium")}">
+    <span>${escapeHtml(card.title || "管理建议")}</span>
+    <strong>${escapeHtml(card.conclusion || "暂无明确结论")}</strong>
+    ${evidence.length ? `<div>${evidence.map((item) => `<b>${escapeHtml(item)}</b>`).join("")}</div>` : ""}
+    <p>${escapeHtml(card.action || "建议补充数据后再生成动作。")}</p>
+  </article>`;
+}
+
 function bindAssistantActions(scope) {
   scope.querySelectorAll("[data-agent-action]").forEach((button) => {
     button.addEventListener("click", async () => {
@@ -297,7 +321,7 @@ function bindAssistantActions(scope) {
         generateOutlineInModal(employeeKey);
       }
       if (type === "profile" && employeeKey) {
-        openEmployeeDrawer(employeeKey);
+        openEmployeeDrawer(employeeKey, "", { editable: false });
       }
       if (type === "todo" && employeeKey) {
         button.disabled = true;
@@ -315,11 +339,11 @@ function bindAssistantActions(scope) {
   });
 }
 
-function addChatBubble(text, role, actions = []) {
+function addChatBubble(text, role, actions = [], card = null) {
   const chat = document.querySelector(".chat-preview");
   const bubble = document.createElement("div");
   bubble.className = `bubble ${role}`;
-  bubble.innerHTML = role === "assistant" ? `${formatAssistantMessage(text)}${renderAssistantActions(actions)}` : escapeHtml(text);
+  bubble.innerHTML = role === "assistant" ? `${renderAssistantCard(card)}${formatAssistantMessage(text)}${renderAssistantActions(actions)}` : escapeHtml(text);
   chat.appendChild(bubble);
   if (role === "assistant") bindAssistantActions(bubble);
   chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
@@ -336,7 +360,7 @@ async function submitChat(message, intent = "") {
   try {
     const result = await postJson("/api/chat", { message, intent, history: assistantHistory });
     thinking.remove();
-    addChatBubble(result.reply || "建议优先查看风险画像，并生成 1 对 1 沟通提纲。", "assistant", result.actions || []);
+    addChatBubble(result.reply || "建议优先查看风险画像，并生成 1 对 1 沟通提纲。", "assistant", result.actions || [], result.card || null);
     assistantHistory.push({ role: "user", content: message });
     assistantHistory.push({ role: "assistant", content: result.reply || "" });
   } catch {
@@ -399,7 +423,7 @@ function buildFocusQueue() {
     .filter(shouldShowInFocus)
     .map((employee) => {
       const relatedTodo = smartTodos.find((todo) => todo.employeeKey === employee.key);
-      const evidence = employee.evidence?.length ? employee.evidence : employee.riskFactors || [];
+      const evidence = employee.riskSignals?.length ? employee.riskSignals.map(signalText).filter(Boolean) : employee.evidence?.length ? employee.evidence : employee.riskFactors || [];
       return {
         id: `focus-${employee.key}`,
         todoId: relatedTodo?.id || "",
@@ -449,7 +473,7 @@ function renderFocusDetail(item) {
     </section>
     <section class="focus-mini-grid">
       <div><span>风险等级</span><strong>${escapeHtml(todoLevelLabel(item.level))}</strong></div>
-      <div><span>当前风险分</span><strong>${escapeHtml(employee.risk || "--")}</strong></div>
+      <div><span>处理状态</span><strong>${escapeHtml(todoStatus(item))}</strong></div>
     </section>
     <section class="focus-evidence">
       <span>风险依据</span>
@@ -468,7 +492,7 @@ function renderFocusDetail(item) {
       <button type="button" data-focus-workbench><i data-lucide="clipboard-list"></i><span>进入待办</span></button>
     </div>
   `;
-  detail.querySelector("[data-focus-open]")?.addEventListener("click", (event) => openEmployeeDrawer(event.currentTarget.dataset.focusOpen, item.id));
+  detail.querySelector("[data-focus-open]")?.addEventListener("click", (event) => openEmployeeDrawer(event.currentTarget.dataset.focusOpen, item.id, { editable: false }));
   detail.querySelector("[data-focus-outline]")?.addEventListener("click", (event) => generateOutlineInModal(event.currentTarget.dataset.focusOutline));
   detail.querySelector("[data-focus-workbench]")?.addEventListener("click", () => {
     selectedTodoId = item.todoId || item.id;
@@ -506,7 +530,7 @@ function renderRiskTable() {
       selectedFocusId = item.id;
       renderRiskTable(source);
     });
-    row.addEventListener("dblclick", () => openEmployeeDrawer(employeeKey, item.todoId || item.id));
+    row.addEventListener("dblclick", () => openEmployeeDrawer(employeeKey, item.todoId || item.id, { editable: false }));
     table.appendChild(row);
   });
   renderFocusDetail(selectedFocusItem(source));
@@ -520,9 +544,9 @@ function statusClass(status = "待处理") {
 }
 
 function todoLevelLabel(level = "medium") {
-  if (level === "high") return "高优先级";
-  if (level === "low") return "低优先级";
-  return "中优先级";
+  if (level === "high") return "高风险";
+  if (level === "low") return "低风险";
+  return "中风险";
 }
 
 function todoById(todoId) {
@@ -535,15 +559,25 @@ function renderTodoWorkbench() {
   if (!list) return;
   const items = smartTodos || [];
   if (count) count.textContent = `${items.length} 项`;
-  if (!selectedTodoId && items.length) selectedTodoId = items[0].id;
-  if (selectedTodoId && !todoById(selectedTodoId)) selectedTodoId = items[0]?.id || "";
+  const firstOpen = items.find((item) => !["已完成", "已忽略"].includes(item.status)) || items[0];
+  if (!selectedTodoId && items.length) selectedTodoId = firstOpen.id;
+  if (selectedTodoId && !todoById(selectedTodoId)) selectedTodoId = firstOpen?.id || "";
   list.innerHTML = "";
   if (!items.length) {
     list.innerHTML = `<div class="todo-empty">暂无待办，可先补充员工沟通记录或运行 AI 分析。</div>`;
     renderTodoDetail(null);
     return;
   }
-  items.forEach((item) => {
+  const groups = [
+    { title: "今日待办", hint: "需要处理或开始的事项", items: items.filter((item) => !item.status || item.status === "待处理") },
+    { title: "处理中", hint: "已经进入跟进中的事项", items: items.filter((item) => item.status === "处理中") },
+    { title: "历史待办", hint: "已完成或已忽略的事项", items: items.filter((item) => ["已完成", "已忽略"].includes(item.status)) },
+  ].filter((group) => group.items.length);
+  groups.forEach((group) => {
+    const section = document.createElement("section");
+    section.className = "todo-group";
+    section.innerHTML = `<div class="todo-group-title"><strong>${escapeHtml(group.title)}</strong><small>${escapeHtml(group.hint)} · ${group.items.length} 项</small></div>`;
+    group.items.forEach((item) => {
     const employee = employees[item.employeeKey] || {};
     const button = document.createElement("button");
     button.type = "button";
@@ -558,7 +592,9 @@ function renderTodoWorkbench() {
       selectedTodoId = item.id;
       renderTodoWorkbench();
     });
-    list.appendChild(button);
+      section.appendChild(button);
+    });
+    list.appendChild(section);
   });
   renderTodoDetail(todoById(selectedTodoId));
   initIcons();
@@ -604,9 +640,9 @@ function renderTodoDetail(item) {
       <button type="button" class="danger-action" data-todo-delete><i data-lucide="trash-2"></i><span>删除</span></button>
     </div>
   `;
-  panel.querySelector("[data-todo-open-employee]")?.addEventListener("click", () => openEmployeeDrawer(item.employeeKey, item.id));
+  panel.querySelector("[data-todo-open-employee]")?.addEventListener("click", () => openEmployeeDrawer(item.employeeKey, item.id, { editable: false }));
   panel.querySelector("[data-todo-outline]")?.addEventListener("click", () => generateOutlineInModal(item.employeeKey));
-  panel.querySelector("[data-todo-complete]")?.addEventListener("click", () => openEmployeeDrawer(item.employeeKey, item.id));
+  panel.querySelector("[data-todo-complete]")?.addEventListener("click", () => openEmployeeDrawer(item.employeeKey, item.id, { editable: false }));
   panel.querySelectorAll("[data-todo-status]").forEach((button) => {
     button.addEventListener("click", () => updateTodoStatus(item.id, button.dataset.todoStatus));
   });
@@ -694,7 +730,8 @@ function drawerField(label, value) {
   return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "待补充")}</strong></div>`;
 }
 
-function editableDrawerField(label, value, key, multiline = false) {
+function editableDrawerField(label, value, key, multiline = false, editable = true) {
+  if (!editable) return drawerField(label, value);
   return `<div class="drawer-edit-card">
     <span>${escapeHtml(label)}</span>
     <strong class="editable-cell drawer-editable ${multiline ? "multiline" : ""}" contenteditable="true" spellcheck="false" data-edit-entity="employee" data-edit-key="${escapeHtml(key)}">${escapeHtml(value || "")}</strong>
@@ -710,6 +747,7 @@ function renderDrawerArchiveDetails(employeeKey, activeTab = "basic") {
   const tabs = document.querySelector("[data-drawer-profile-tabs]");
   const detail = document.querySelector("[data-drawer-profile-detail]");
   if (!employee || !tabs || !detail) return;
+  const editable = document.querySelector("[data-employee-drawer]")?.dataset.editable === "true";
   const latestRecord = latestCommunicationForEmployee(employee);
   const tabItems = [
     { key: "basic", label: "基本信息" },
@@ -722,43 +760,43 @@ function renderDrawerArchiveDetails(employeeKey, activeTab = "basic") {
   tabs.innerHTML = tabItems.map((item) => `<button class="${item.key === activeTab ? "active" : ""}" type="button" data-drawer-profile-tab="${escapeHtml(item.key)}">${escapeHtml(item.label)}</button>`).join("");
   const panels = {
     basic: `<div class="drawer-profile-grid">
-      ${editableDrawerField("姓名", employee.name, "name")}
-      ${editableDrawerField("工号", employee.employeeId, "employeeId")}
-      ${editableDrawerField("部门", employee.department, "department")}
-      ${editableDrawerField("岗位", employee.role, "role")}
-      ${editableDrawerField("入职日期", employee.hireDate, "hireDate")}
-      ${editableDrawerField("直属主管", employee.manager, "manager")}
+      ${editableDrawerField("姓名", employee.name, "name", false, editable)}
+      ${editableDrawerField("工号", employee.employeeId, "employeeId", false, editable)}
+      ${editableDrawerField("部门", employee.department, "department", false, editable)}
+      ${editableDrawerField("岗位", employee.role, "role", false, editable)}
+      ${editableDrawerField("入职日期", employee.hireDate, "hireDate", false, editable)}
+      ${editableDrawerField("直属主管", employee.manager, "manager", false, editable)}
       ${drawerField("最近沟通", latestRecord?.date)}
-      ${editableDrawerField("合同到期", employee.contractEndDate, "contractEndDate")}
-      ${editableDrawerField("转正日期", employee.probationEndDate, "probationEndDate")}
+      ${editableDrawerField("合同到期", employee.contractEndDate, "contractEndDate", false, editable)}
+      ${editableDrawerField("转正日期", employee.probationEndDate, "probationEndDate", false, editable)}
     </div>`,
     performance: `<div class="drawer-profile-grid">
-      ${editableDrawerField("当前绩效", employee.performanceRating, "performanceRating")}
-      ${editableDrawerField("绩效趋势", employee.performanceTrend, "performanceTrend")}
-      ${editableDrawerField("目标完成率", employee.goalCompletionRate, "goalCompletionRate")}
+      ${editableDrawerField("当前绩效", employee.performanceRating, "performanceRating", false, editable)}
+      ${editableDrawerField("绩效趋势", employee.performanceTrend, "performanceTrend", false, editable)}
+      ${editableDrawerField("目标完成率", employee.goalCompletionRate, "goalCompletionRate", false, editable)}
       ${drawerField("AI 绩效判断", employee.performance)}
     </div>`,
     growth: `<div class="drawer-profile-grid">
       ${drawerField("生命周期阶段", employeeStage(employee))}
-      ${editableDrawerField("导师", employee.mentor, "mentor")}
-      ${editableDrawerField("成长摘要", employee.growthSummary, "growthSummary", true)}
+      ${editableDrawerField("导师", employee.mentor, "mentor", false, editable)}
+      ${editableDrawerField("成长摘要", employee.growthSummary, "growthSummary", true, editable)}
       ${drawerField("建议动作", employee.suggestedAction || employee.goal)}
     </div>`,
     awards: `<div class="drawer-profile-grid">
-      ${editableDrawerField("获奖摘要", employee.awardsSummary, "awardsSummary", true)}
+      ${editableDrawerField("获奖摘要", employee.awardsSummary, "awardsSummary", true, editable)}
       ${drawerField("正向记录", employee.awardsSummary || "暂无获奖记录")}
     </div>`,
     attendance: `<div class="drawer-profile-grid">
-      ${editableDrawerField("30天加班", employee.overtimeHours30d, "overtimeHours30d")}
-      ${editableDrawerField("30天迟到", employee.lateCount30d, "lateCount30d")}
-      ${editableDrawerField("30天请假", employee.leaveDays30d, "leaveDays30d")}
+      ${editableDrawerField("30天加班", employee.overtimeHours30d, "overtimeHours30d", false, editable)}
+      ${editableDrawerField("30天迟到", employee.lateCount30d, "lateCount30d", false, editable)}
+      ${editableDrawerField("30天请假", employee.leaveDays30d, "leaveDays30d", false, editable)}
       ${drawerField("AI 考勤判断", employee.attendance)}
     </div>`,
     events: `<div class="drawer-list">
-      <div class="drawer-edit-card wide">
+      ${editable ? `<div class="drawer-edit-card wide">
         <span>备注/关键事件</span>
         <strong class="editable-cell drawer-editable multiline" contenteditable="true" spellcheck="false" data-edit-entity="employee" data-edit-key="keyEvents">${escapeHtml(employee.keyEvents || "")}</strong>
-      </div>
+      </div>` : drawerEventItem("备注/关键事件", employee.keyEvents || "暂无补充说明")}
       ${drawerEventItem("风险原因", employee.reason)}
       ${drawerEventItem("最近沟通", latestRecord ? `${latestRecord.date} · ${latestRecord.summary}` : "暂无沟通记录")}
     </div>`
@@ -767,7 +805,7 @@ function renderDrawerArchiveDetails(employeeKey, activeTab = "basic") {
   detail.querySelectorAll("[data-edit-entity='employee']").forEach((cell) => {
     cell.dataset.rowKey = employeeKey;
   });
-  bindEditableCells(detail);
+  if (editable) bindEditableCells(detail);
   tabs.querySelectorAll("[data-drawer-profile-tab]").forEach((button) => {
     button.addEventListener("click", () => renderDrawerArchiveDetails(employeeKey, button.dataset.drawerProfileTab));
   });
@@ -788,16 +826,19 @@ function renderDrawerWorkflow(employeeKey) {
     : `<div class="drawer-list-item muted"><strong>暂无沟通记录</strong><span>记录一次沟通后会自动进入历史。</span></div>`;
 }
 
-async function openEmployeeDrawer(employeeKey, todoId = "") {
+async function openEmployeeDrawer(employeeKey, todoId = "", options = {}) {
   const employee = employees[employeeKey];
   if (!employee) return;
   const drawer = document.querySelector("[data-employee-drawer]");
+  const editable = options.editable === true;
   drawer.dataset.employee = employeeKey;
   drawer.dataset.todo = todoId || selectedTodoId || "";
+  drawer.dataset.editable = editable ? "true" : "false";
   document.querySelector("[data-drawer-name]").textContent = employee.name;
   document.querySelector("[data-drawer-role]").textContent = employee.role;
-  document.querySelector("[data-drawer-risk]").textContent = employee.risk || "--";
   document.querySelector("[data-drawer-level]").textContent = employee.level;
+  document.querySelector("[data-drawer-save-edits]")?.toggleAttribute("hidden", !editable);
+  document.querySelector("[data-drawer-analyze]")?.toggleAttribute("hidden", !editable);
   renderEmployeeProfile(employeeKey, profileFallbacks[employeeKey]);
   renderDrawerArchiveDetails(employeeKey);
   renderDrawerWorkflow(employeeKey);
@@ -1017,7 +1058,7 @@ function renderArchiveEmployees() {
   table.querySelectorAll(".archive-employee-row[data-row-key]").forEach((row) => {
     row.addEventListener("dblclick", (event) => {
       if (event.target.closest("button")) return;
-      openEmployeeDrawer(row.dataset.rowKey);
+      openEmployeeDrawer(row.dataset.rowKey, "", { editable: true });
     });
   });
   table.querySelectorAll("[data-delete-employee]").forEach((button) => {
@@ -1068,7 +1109,7 @@ async function analyzeEmployee(employeeKey, trigger) {
     if (result.employee) {
       syncEmployeesFromArchive([...(archiveEmployees.filter((item) => item.key !== result.employee.key)), result.employee]);
     }
-    openEmployeeDrawer(employeeKey);
+    openEmployeeDrawer(employeeKey, "", { editable: true });
   } catch {
     if (trigger) trigger.textContent = previousText || "AI分析";
   } finally {
@@ -1293,7 +1334,7 @@ function activateUi() {
       if (item.dataset.viewTarget) showView(item.dataset.viewTarget);
     });
   });
-  document.querySelectorAll("[data-open-employee]").forEach((button) => button.addEventListener("click", () => openEmployeeDrawer(button.dataset.openEmployee)));
+  document.querySelectorAll("[data-open-employee]").forEach((button) => button.addEventListener("click", () => openEmployeeDrawer(button.dataset.openEmployee, "", { editable: false })));
   document.querySelector("[data-close-drawer]")?.addEventListener("click", closeEmployeeDrawer);
   document.querySelector("[data-drawer-backdrop]")?.addEventListener("click", closeEmployeeDrawer);
   document.querySelector("[data-drawer-outline]")?.addEventListener("click", () => {

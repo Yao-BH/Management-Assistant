@@ -13,9 +13,15 @@ def fallback_profile_for(employee):
     lifecycle = employee.get("lifecycle") or {}
     if isinstance(lifecycle, str):
         lifecycle = {"stage": lifecycle, "detail": ""}
+    signals = employee.get("riskSignals") or []
+    signal_labels = [
+        f"{item.get('label')}：{item.get('value')}" if item.get("label") and item.get("value") and item.get("label") != item.get("value") else item.get("label") or item.get("value")
+        for item in signals
+        if item.get("label") or item.get("value")
+    ]
     return {
         "riskSummary": employee.get("reason") or "当前员工缺少足够分析数据，建议补充沟通记录、绩效或关键节点。",
-        "evidence": employee.get("evidence") or ["基础档案已录入", "等待 AI 分析"],
+        "evidence": signal_labels or employee.get("evidence") or ["基础档案已录入", "等待 AI 分析"],
         "performance": employee.get("performance") or "待分析",
         "attendance": employee.get("attendance") or "待分析",
         "communication": employee.get("communication") or "待分析",
@@ -43,11 +49,17 @@ def local_profile(employee, records):
     lifecycle = employee.get("lifecycle") or {}
     if isinstance(lifecycle, str):
         lifecycle = {"stage": lifecycle, "detail": ""}
+    signals = employee.get("riskSignals") or []
+    signal_labels = [
+        f"{item.get('label')}：{item.get('value')}" if item.get("label") and item.get("value") and item.get("label") != item.get("value") else item.get("label") or item.get("value")
+        for item in signals
+        if item.get("label") or item.get("value")
+    ]
     return {
         "risk": risk,
         "level": level,
         "riskSummary": employee.get("reason") or f"{employee['name']}当前信息量有限，{record_hint}，建议补充绩效、考勤和近期沟通信息后复核。",
-        "evidence": employee.get("evidence") or ["员工基础档案已录入", record_hint],
+        "evidence": signal_labels or employee.get("evidence") or ["员工基础档案已录入", record_hint],
         "performance": employee.get("performance") or "待分析",
         "attendance": employee.get("attendance") or "待分析",
         "communication": f"{len(records)} 条沟通记录" if records else "暂无沟通记录",

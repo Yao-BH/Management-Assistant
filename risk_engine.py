@@ -56,6 +56,20 @@ def infer_level(score):
     return "低风险"
 
 
+def signal(label, value, score_delta, severity="medium", signal_type=None, source_ref_type="employee_field"):
+    return {
+        "type": signal_type or label,
+        "label": label,
+        "value": str(value),
+        "scoreDelta": score_delta,
+        "severity": severity,
+        "confidence": 100,
+        "source": "rule",
+        "sourceRefType": source_ref_type,
+        "sourceRefId": "",
+    }
+
+
 def rule_profile(employee, records=None):
     records = records if records is not None else database.list_communication_records()
     latest_record = latest_record_for(employee, records)
@@ -63,70 +77,95 @@ def rule_profile(employee, records=None):
     risk = 0
     factors = []
     evidence = []
+    signals = []
 
     trend = employee.get("performanceTrend")
     if trend in ("明显下滑", "连续下滑"):
         risk += 25
-        factors.append("绩效下滑")
-        evidence.append(f"绩效趋势：{trend}")
+        item = signal("绩效下滑", f"绩效趋势：{trend}", 25, "high", "performance_drop")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
     elif trend == "轻微下滑":
         risk += 12
-        factors.append("绩效波动")
-        evidence.append("绩效趋势：轻微下滑")
+        item = signal("绩效波动", "绩效趋势：轻微下滑", 12, "medium", "performance_drop")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
 
     goal_rate = int(employee.get("goalCompletionRate") or 0)
     if goal_rate and goal_rate < 70:
         risk += 15
-        factors.append("目标完成率偏低")
-        evidence.append(f"目标完成率 {goal_rate}%")
+        item = signal("目标完成率偏低", f"目标完成率 {goal_rate}%", 15, "medium", "goal_gap")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
 
     last_gap = days_since(latest_record["date"]) if latest_record else None
     if last_gap is None:
         risk += 18
-        factors.append("沟通缺失")
-        evidence.append("暂无沟通记录")
+        item = signal("沟通缺失", "暂无沟通记录", 18, "high", "communication_gap", "communication_record")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
     elif last_gap >= 30:
         risk += 18
-        factors.append("沟通缺失")
-        evidence.append(f"距上次沟通 {last_gap} 天")
+        item = signal("30 天未沟通", f"距上次沟通 {last_gap} 天", 18, "high", "communication_gap", "communication_record")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
 
     overtime = float(employee.get("overtimeHours30d") or 0)
     late_count = int(employee.get("lateCount30d") or 0)
     leave_days = float(employee.get("leaveDays30d") or 0)
     if overtime >= 30:
         risk += 15
-        factors.append("加班偏高")
-        evidence.append(f"近 30 天加班 {overtime:g} 小时")
+        item = signal("加班偏高", f"近 30 天加班 {overtime:g} 小时", 15, "medium", "overtime")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
     if late_count >= 4:
         risk += 10
-        factors.append("考勤异常")
-        evidence.append(f"近 30 天迟到 {late_count} 次")
+        item = signal("考勤异常", f"近 30 天迟到 {late_count} 次", 10, "medium", "attendance_issue")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
     if leave_days >= 5:
         risk += 8
-        factors.append("请假偏多")
-        evidence.append(f"近 30 天请假 {leave_days:g} 天")
+        item = signal("请假偏多", f"近 30 天请假 {leave_days:g} 天", 8, "low", "leave_high")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
 
     contract_days = days_until(employee.get("contractEndDate"))
     if contract_days is not None and 0 <= contract_days <= 30:
         risk += 12
-        factors.append("合同临期")
-        evidence.append(f"合同 {contract_days} 天后到期")
+        item = signal("合同临期", f"合同 {contract_days} 天后到期", 12, "medium", "contract_due")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
 
     probation_days = days_until(employee.get("probationEndDate"))
     if probation_days is not None and 0 <= probation_days <= 14:
         risk += 10
-        factors.append("转正节点")
-        evidence.append(f"转正节点 {probation_days} 天后到期")
+        item = signal("转正节点", f"转正节点 {probation_days} 天后到期", 10, "medium", "probation_due")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
 
     if employee.get("compensationSignal") in ("不满", "强烈不满", "外部机会"):
         risk += 18
-        factors.append("薪酬/机会风险")
-        evidence.append(f"薪酬信号：{employee['compensationSignal']}")
+        item = signal("薪酬/机会风险", f"薪酬信号：{employee['compensationSignal']}", 18, "high", "compensation_risk")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
 
     if employee.get("growthSummary") in ("停滞", "缺少成长", "晋升受阻"):
         risk += 10
-        factors.append("成长停滞")
-        evidence.append(f"成长信息：{employee['growthSummary']}")
+        item = signal("成长停滞", f"成长信息：{employee['growthSummary']}", 10, "medium", "growth_stagnation")
+        factors.append(item["label"])
+        evidence.append(item["value"])
+        signals.append(item)
 
     risk = min(risk, 100)
     level = infer_level(risk)
@@ -139,6 +178,7 @@ def rule_profile(employee, records=None):
         "riskSummary": "；".join(evidence) if evidence else "规则扫描未发现明显风险信号。",
         "evidence": evidence or ["规则扫描通过"],
         "riskFactors": factors,
+        "riskSignals": signals,
         "performance": employee.get("performanceRating") or employee.get("performance") or "待分析",
         "attendance": f"加班{overtime:g}h / 迟到{late_count}次 / 请假{leave_days:g}天",
         "communication": f"距上次沟通 {last_gap} 天" if last_gap is not None else "暂无沟通记录",

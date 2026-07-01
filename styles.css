@@ -182,6 +182,15 @@ h3 { margin-bottom: 10px; font-size: 17px; }
 .bubble strong { color: var(--blue-deep); font-weight: 900; }
 .bubble .assistant-heading { display: inline-flex; align-items: center; margin-bottom: 8px; padding: 4px 9px; border-radius: 999px; color: var(--blue-deep); background: rgba(100,181,246,.14); font-weight: 900; }
 .bubble .assistant-action { margin-top: 8px; padding: 8px 10px; border-radius: 12px; color: #183356; background: rgba(100,181,246,.12); }
+.assistant-card { display: grid; gap: 8px; margin-bottom: 10px; padding: 12px; border: 1px solid rgba(255,255,255,.66); border-left: 4px solid var(--blue); border-radius: 14px; background: rgba(255,255,255,.58); box-shadow: var(--inner-light); }
+.assistant-card.high { border-left-color: var(--pink); }
+.assistant-card.medium { border-left-color: var(--amber); }
+.assistant-card.low { border-left-color: var(--green); }
+.assistant-card > span { color: var(--muted); font-size: 12px; font-weight: 900; }
+.assistant-card > strong { color: var(--ink); line-height: 1.45; }
+.assistant-card div { display: flex; flex-wrap: wrap; gap: 6px; }
+.assistant-card b { padding: 4px 7px; border-radius: 999px; color: var(--blue-deep); background: rgba(100,181,246,.13); font-size: 12px; }
+.assistant-card p { color: #40516b; }
 .assistant-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
 .assistant-actions button { min-height: 28px; padding: 0 9px; border: 1px solid rgba(255,255,255,.7); border-radius: 999px; color: var(--blue-deep); background: rgba(255,255,255,.58); box-shadow: var(--inner-light); font-size: 12px; font-weight: 800; }
 .assistant-actions button:disabled { color: var(--muted); cursor: default; }
@@ -322,6 +331,11 @@ h3 { margin-bottom: 10px; font-size: 17px; }
 .todo-workbench-grid { display: grid; grid-template-columns: minmax(310px,.82fr) minmax(0,1.18fr); gap: 24px; align-items: stretch; }
 .todo-list-panel, .todo-detail-panel { min-height: 560px; padding: 24px; background: linear-gradient(150deg, rgba(255,255,255,.62), rgba(236,247,255,.38)); }
 .todo-list { display: grid; gap: 12px; }
+.todo-group { display: grid; gap: 10px; }
+.todo-group + .todo-group { margin-top: 8px; padding-top: 12px; border-top: 1px solid rgba(72,92,120,.1); }
+.todo-group-title { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 0 4px; }
+.todo-group-title strong { color: var(--ink); font-size: 14px; }
+.todo-group-title small { color: var(--muted); font-size: 12px; text-align: right; }
 .todo-card { position: relative; display: grid; grid-template-columns: auto minmax(0,1fr) auto; gap: 6px 12px; align-items: center; width: 100%; min-height: 94px; padding: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,.64); border-radius: 22px; color: var(--ink); background: rgba(255,255,255,.38); box-shadow: var(--inner-light), 0 16px 34px rgba(61,85,118,.08); text-align: left; }
 .todo-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 4px; background: linear-gradient(180deg, var(--blue), var(--cyan)); opacity: .8; }
 .todo-card.selected { border-color: rgba(114,216,233,.78); background: rgba(255,255,255,.62); box-shadow: var(--inner-light), 0 22px 42px rgba(69,106,148,.16); }
@@ -362,9 +376,9 @@ h3 { margin-bottom: 10px; font-size: 17px; }
 .drawer-head h2 { margin-bottom: 5px; font-size: 30px; }
 .drawer-head span, .drawer-section p { color: var(--muted); }
 .drawer-head button { display: grid; place-items: center; width: 38px; height: 38px; border: 0; border-radius: 50%; color: var(--ink); background: rgba(255,255,255,.64); }
-.drawer-score { justify-content: space-between; padding: 18px; border-radius: 22px; color: #fff; background: linear-gradient(135deg, #0f2b53, #2d6591); }
+.drawer-score { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 18px; border-radius: 22px; color: #fff; background: linear-gradient(135deg, #0f2b53, #2d6591); }
 .drawer-score span, .drawer-score small { display: block; color: rgba(255,255,255,.76); }
-.drawer-score strong { font-size: 46px; }
+.drawer-score small { padding: 7px 12px; border-radius: 999px; color: #fff; background: rgba(255,255,255,.18); font-size: 13px; font-weight: 900; }
 .drawer-section { padding: 16px; border-radius: 20px; box-shadow: var(--inner-light), 0 12px 28px rgba(72,94,125,.08); }
 .drawer-section p { margin-bottom: 0; line-height: 1.65; }
 .drawer-tags { display: flex; flex-wrap: wrap; gap: 8px; }

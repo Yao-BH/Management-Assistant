@@ -40,7 +40,11 @@ def should_have_focus_todo(employee):
 
 
 def todo_from_employee(employee):
-    evidence = employee.get("evidence") or employee.get("riskFactors") or []
+    signals = employee.get("riskSignals") or []
+    evidence = [
+        f"{signal.get('label')}：{signal.get('value')}" if signal.get("label") and signal.get("value") and signal.get("label") != signal.get("value") else signal.get("label") or signal.get("value")
+        for signal in signals
+    ] or employee.get("evidence") or employee.get("riskFactors") or []
     return {
         "id": f"system-{employee['key']}",
         "employeeKey": employee["key"],

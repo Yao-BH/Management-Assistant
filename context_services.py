@@ -5,6 +5,7 @@ def build_team_context():
     employees = database.list_employees()
     records = database.list_communication_records()
     todos = database.list_todos()
+    risk_signals = database.list_risk_signals()
     focus = [
         employee
         for employee in employees
@@ -26,6 +27,7 @@ def build_team_context():
         "employees": employees,
         "communication_records": records[:20],
         "todos": todos[:10],
+        "risk_signals": risk_signals[:50],
     }
 
 
@@ -53,6 +55,9 @@ def build_focus_context():
         "focus_employees": focus,
         "related_communication_records": records,
         "related_todos": todos,
+        "related_risk_signals": [
+            signal for signal in context.get("risk_signals", []) if signal["employeeKey"] in focus_keys
+        ],
     }
 
 
@@ -75,5 +80,6 @@ def get_archive():
         "employees": database.list_employees(),
         "communicationRecords": database.list_communication_records(),
         "todos": database.list_todos(),
+        "riskSignals": database.list_risk_signals(),
         "metrics": get_metrics()["items"],
     }
