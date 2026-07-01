@@ -69,7 +69,7 @@ function formatAssistantMessage(text) {
       return;
     }
     flushList();
-    const actionLike = /^(动作|建议|下一步|优先处理|风险原因)[:：]/.test(cleaned);
+    const actionLike = /^(结论|依据|建议|动作|下一步|优先处理|风险原因|需要补充)[:：]/.test(cleaned);
     blocks.push(`<p class="${actionLike ? "assistant-action" : ""}">${inlineFormat(cleaned)}</p>`);
   });
   flushList();
@@ -296,56 +296,12 @@ async function loadBrief() {
   }
 }
 
-function renderAssistantActions(actions = []) {
-  if (!actions.length) return "";
-  return `<div class="assistant-actions">${actions.map((action) => `<button type="button" data-agent-action="${escapeHtml(action.type)}" data-agent-employee="${escapeHtml(action.employeeKey || "")}">${escapeHtml(action.label)}</button>`).join("")}</div>`;
-}
-
-function renderAssistantCard(card) {
-  if (!card) return "";
-  const evidence = (card.evidence || []).slice(0, 4);
-  return `<article class="assistant-card ${escapeHtml(card.tone || "medium")}">
-    <span>${escapeHtml(card.title || "管理建议")}</span>
-    <strong>${escapeHtml(card.conclusion || "暂无明确结论")}</strong>
-    ${evidence.length ? `<div>${evidence.map((item) => `<b>${escapeHtml(item)}</b>`).join("")}</div>` : ""}
-    <p>${escapeHtml(card.action || "建议补充数据后再生成动作。")}</p>
-  </article>`;
-}
-
-function bindAssistantActions(scope) {
-  scope.querySelectorAll("[data-agent-action]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const type = button.dataset.agentAction;
-      const employeeKey = button.dataset.agentEmployee;
-      if (type === "outline" && employeeKey) {
-        generateOutlineInModal(employeeKey);
-      }
-      if (type === "profile" && employeeKey) {
-        openEmployeeDrawer(employeeKey, "", { editable: false });
-      }
-      if (type === "todo" && employeeKey) {
-        button.disabled = true;
-        button.textContent = "已加入";
-        try {
-          const result = await postJson("/api/action-todo", { employeeKey });
-          smartTodos = result.items || smartTodos;
-          renderRiskTable(smartTodos);
-          loadMetrics();
-        } catch {
-          button.textContent = "加入失败";
-        }
-      }
-    });
-  });
-}
-
 function addChatBubble(text, role, actions = [], card = null) {
   const chat = document.querySelector(".chat-preview");
   const bubble = document.createElement("div");
   bubble.className = `bubble ${role}`;
-  bubble.innerHTML = role === "assistant" ? `${renderAssistantCard(card)}${formatAssistantMessage(text)}${renderAssistantActions(actions)}` : escapeHtml(text);
+  bubble.innerHTML = role === "assistant" ? formatAssistantMessage(text) : escapeHtml(text);
   chat.appendChild(bubble);
-  if (role === "assistant") bindAssistantActions(bubble);
   chat.scrollTo({ top: chat.scrollHeight, behavior: "smooth" });
 }
 

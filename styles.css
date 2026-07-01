@@ -168,34 +168,22 @@ h3 { margin-bottom: 10px; font-size: 17px; }
 .ai-orb { width: 156px; height: 156px; object-fit: cover; align-self: center; margin: 16px 0 20px; border-radius: 50%; filter: drop-shadow(0 24px 28px rgba(79,124,178,.2)); transition: width 220ms ease, height 220ms ease, margin 220ms ease, opacity 180ms ease, transform 220ms ease; }
 .agent-capabilities { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 0 14px; transition: max-height 220ms ease, opacity 180ms ease, margin 220ms ease; }
 .agent-capabilities span { padding: 5px 9px; border-radius: 999px; color: var(--blue-deep); background: rgba(255,255,255,.44); font-size: 12px; font-weight: 800; }
-.chat-preview { display: grid; gap: 8px; flex: 0 0 auto; min-height: 0; max-height: 132px; margin-top: 0; padding: 4px 4px 8px; overflow-y: auto; overscroll-behavior: contain; transition: max-height 220ms ease; }
+.chat-preview { display: grid; align-content: start; gap: 8px; flex: 0 0 auto; min-height: 0; max-height: 132px; margin-top: 0; padding: 4px 10px 8px 4px; overflow-y: auto; overscroll-behavior: contain; transition: max-height 220ms ease; }
 .quick-actions { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 8px; margin-top: 10px; }
 .quick-actions button { min-height: 30px; padding: 0 7px; border: 1px solid rgba(255,255,255,.62); border-radius: 999px; color: var(--blue-deep); background: rgba(255,255,255,.42); box-shadow: var(--inner-light); font-size: 12px; font-weight: 800; white-space: nowrap; }
 .copilot-card.chat-active .ai-orb { width: 0; height: 0; margin: 0; opacity: 0; transform: scale(.74); pointer-events: none; }
 .copilot-card.chat-active .agent-capabilities { max-height: 0; margin: 0; opacity: 0; overflow: hidden; pointer-events: none; }
-.copilot-card.chat-active .chat-preview { max-height: 342px; }
-.bubble { max-width: 95%; padding: 12px 14px; border-radius: 18px; font-size: 13px; line-height: 1.55; text-align: left; }
-.bubble p { margin: 0 0 8px; }
+.copilot-card.chat-active .chat-preview { max-height: 330px; }
+.bubble { max-width: min(88%, 360px); padding: 10px 13px; border-radius: 17px; font-size: 13px; line-height: 1.55; text-align: left; overflow-wrap: anywhere; }
+.bubble p { margin: 0 0 6px; }
 .bubble p:last-child { margin-bottom: 0; }
-.bubble ol { display: grid; gap: 7px; margin: 2px 0 0; padding-left: 18px; }
+.bubble ol { display: grid; gap: 5px; margin: 4px 0 0; padding-left: 18px; }
 .bubble li { padding-left: 2px; }
 .bubble strong { color: var(--blue-deep); font-weight: 900; }
 .bubble .assistant-heading { display: inline-flex; align-items: center; margin-bottom: 8px; padding: 4px 9px; border-radius: 999px; color: var(--blue-deep); background: rgba(100,181,246,.14); font-weight: 900; }
-.bubble .assistant-action { margin-top: 8px; padding: 8px 10px; border-radius: 12px; color: #183356; background: rgba(100,181,246,.12); }
-.assistant-card { display: grid; gap: 8px; margin-bottom: 10px; padding: 12px; border: 1px solid rgba(255,255,255,.66); border-left: 4px solid var(--blue); border-radius: 14px; background: rgba(255,255,255,.58); box-shadow: var(--inner-light); }
-.assistant-card.high { border-left-color: var(--pink); }
-.assistant-card.medium { border-left-color: var(--amber); }
-.assistant-card.low { border-left-color: var(--green); }
-.assistant-card > span { color: var(--muted); font-size: 12px; font-weight: 900; }
-.assistant-card > strong { color: var(--ink); line-height: 1.45; }
-.assistant-card div { display: flex; flex-wrap: wrap; gap: 6px; }
-.assistant-card b { padding: 4px 7px; border-radius: 999px; color: var(--blue-deep); background: rgba(100,181,246,.13); font-size: 12px; }
-.assistant-card p { color: #40516b; }
-.assistant-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
-.assistant-actions button { min-height: 28px; padding: 0 9px; border: 1px solid rgba(255,255,255,.7); border-radius: 999px; color: var(--blue-deep); background: rgba(255,255,255,.58); box-shadow: var(--inner-light); font-size: 12px; font-weight: 800; }
-.assistant-actions button:disabled { color: var(--muted); cursor: default; }
+.bubble .assistant-action { margin-top: 4px; padding: 0; color: #183356; background: transparent; }
 .bubble.user { justify-self: end; color: #fff; background: var(--blue-deep); }
-.bubble.assistant { justify-self: start; background: rgba(255,255,255,.66); }
+.bubble.assistant { justify-self: start; background: rgba(255,255,255,.68); }
 .chat-input { gap: 8px; height: 48px; margin-top: 12px; padding: 6px 6px 6px 14px; border-radius: 999px; box-shadow: var(--inner-light); }
 .chat-input button { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; border: 0; border-radius: 50%; color: #fff; background: var(--pink); }
 

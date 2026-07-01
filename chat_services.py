@@ -10,6 +10,10 @@ def infer_intent(message, explicit_intent=None):
     if explicit_intent:
         return explicit_intent
     text = message or ""
+    if any(word in text for word in ("你能做什么", "有什么功能", "功能", "你是谁", "怎么用", "能干什么")):
+        return "capability_query"
+    if any(word in text for word in ("团队", "整体", "概况", "总览", "多少人", "人数")):
+        return "team_summary"
     if "优先" in text or "先处理" in text or "今天" in text or "关注谁" in text:
         return "today_priority"
     if "为什么" in text or "原因" in text or "风险" in text:
@@ -43,6 +47,97 @@ def evidence_labels(employee):
         if item.get("label") or item.get("value")
     ]
     return labels or employee.get("evidence") or employee.get("riskFactors") or []
+
+
+def focus_employees(context):
+    focus = [
+        employee
+        for employee in context["employees"]
+        if employee["level"] in ("高风险", "中风险") or employee.get("risk", 0) >= 40 or employee.get("modelRequired")
+    ]
+    return sorted(focus, key=lambda item: item.get("risk", 0), reverse=True)
+
+
+def format_capability_reply():
+    return (
+        "我可以帮你做这些事：\n"
+        "1. 判断今天优先关注谁\n"
+        "2. 解释员工风险原因\n"
+        "3. 生成管理动作和待办建议\n"
+        "4. 辅助准备 1 对 1 沟通\n"
+        "你可以直接问：今天先处理谁？或李四为什么有风险？"
+    )
+
+
+def format_team_summary(context):
+    summary = context.get("summary", {})
+    focus = focus_employees(context)
+    top_names = "、".join(employee["name"] for employee in focus[:3]) or "暂无"
+    return (
+        f"当前团队共 {summary.get('team_size', 0)} 人，重点关注 {summary.get('focus_count', 0)} 人，"
+        f"待办 {summary.get('pending_actions', 0)} 项，沟通覆盖率 {summary.get('communication_coverage', '0%')}。\n"
+        f"当前优先对象：{top_names}。"
+    )
+
+
+def format_today_priority(context):
+    focus = focus_employees(context)
+    if not focus:
+        return "当前暂无明确高风险对象。\n建议先补充沟通记录，并对待分析员工运行分析。"
+    top = focus[0]
+    evidence = evidence_labels(top)[:3]
+    lines = "\n".join(f"{index}. {item}" for index, item in enumerate(evidence, start=1)) or "暂无完整证据。"
+    return (
+        f"今天建议先关注 {top['name']}。\n"
+        f"主要依据：\n{lines}\n"
+        f"建议：{top.get('suggestedAction') or '安排一次状态确认，并记录后续动作。'}"
+    )
+
+
+def format_risk_reason(message, context):
+    employee = select_employee(message, context)
+    if not employee:
+        return "我还没定位到具体员工。\n你可以这样问：李四为什么有风险？"
+    evidence = evidence_labels(employee)[:4]
+    lines = "\n".join(f"{index}. {item}" for index, item in enumerate(evidence, start=1)) or "暂无完整证据。"
+    return (
+        f"{employee['name']}当前为{employee.get('level', '待分析')}。\n"
+        f"主要原因：\n{lines}\n"
+        f"建议：{employee.get('suggestedAction') or '先补充沟通记录，再复核风险。'}"
+    )
+
+
+def format_management_actions(message, context):
+    focus = focus_employees(context)
+    employee = select_employee(message, context) or (focus[0] if focus else None)
+    if not employee:
+        return "当前暂无可生成动作的重点对象。\n建议先补充员工档案、沟通记录或运行风险分析。"
+    return (
+        f"建议围绕 {employee['name']} 先做三件事：\n"
+        "1. 安排一次 1 对 1 沟通\n"
+        "2. 记录风险原因和员工反馈\n"
+        "3. 设置后续跟进动作\n"
+        f"优先动作：{employee.get('suggestedAction') or '完成状态确认'}"
+    )
+
+
+def local_reply_for_intent(message, context, intent):
+    if intent == "capability_query":
+        return format_capability_reply()
+    if intent == "team_summary":
+        return format_team_summary(context)
+    if intent == "today_priority":
+        return format_today_priority(context)
+    if intent == "risk_reason":
+        return format_risk_reason(message, context)
+    if intent in ("management_actions", "create_todo"):
+        return format_management_actions(message, context)
+    if intent == "communication_outline":
+        employee = select_employee(message, context)
+        if employee:
+            return f"可以为 {employee['name']} 准备 1 对 1 沟通提纲。\n建议先围绕风险原因、员工反馈、后续动作三部分展开。"
+        return "可以生成 1 对 1 沟通提纲。\n请告诉我员工姓名，例如：帮我生成李四的沟通提纲。"
+    return fallback_chat_reply(message, context)
 
 
 def build_reply_card(message, context, intent):
@@ -80,13 +175,30 @@ def fallback_chat_reply(message, context):
     for employee in context["employees"]:
         if employee["name"] in message:
             labels = "、".join(evidence_labels(employee)[:3]) or employee.get("reason") or "基础信息不足"
-            return f"{employee['name']}当前为{employee['level']}。主要依据：{labels}。动作：{employee['suggestedAction']}。"
+            return (
+                f"结论：{employee['name']}当前为{employee['level']}。\n"
+                f"依据：{labels}。\n"
+                f"建议：{employee['suggestedAction']}。"
+            )
     if "优先" in message or "关注" in message:
         if focus:
+            top = focus[0]
+            evidence = "、".join(evidence_labels(top)[:3]) or top.get("reason") or "基础信息不足"
             names = "、".join(employee["name"] for employee in focus[:3])
-            return f"今天建议优先关注：{names}。动作：先处理最高风险员工的一对一沟通，再推进关键节点待办。"
-        return "当前暂无高风险员工。动作：建议先补充沟通记录，并对待分析员工运行 AI 分析。"
-    return "我会基于数据库中的员工档案、沟通记录和智能待办回答。你可以问某位员工为什么高风险，或让我生成今日优先级。"
+            return (
+                f"结论：今天优先关注 {top['name']}。\n"
+                f"依据：当前重点对象包括 {names}；{top['name']} 的主要信号是 {evidence}。\n"
+                "建议：先完成最高风险对象的一对一沟通，再推进关键节点待办。"
+            )
+        return (
+            "结论：当前暂无高风险员工。\n"
+            "依据：现有档案未识别出明确高风险对象。\n"
+            "建议：先补充沟通记录，并对待分析员工运行分析。"
+        )
+    return (
+        "结论：我可以基于员工档案、沟通记录和智能待办回答。\n"
+        "建议：你可以问“今天优先关注谁”或“某位员工为什么有风险”。"
+    )
 
 
 def suggest_actions(message, context):
@@ -115,6 +227,15 @@ def generate_chat_reply(message, history=None, intent=None):
     context = build_team_context()
     resolved_intent = infer_intent(message, intent)
     card = build_reply_card(message, context, resolved_intent)
+    if resolved_intent != "general":
+        return {
+            "reply": local_reply_for_intent(message, context, resolved_intent),
+            "source": "Agent 工具路由",
+            "intent": resolved_intent,
+            "card": card,
+            "actions": suggest_actions(message, context),
+        }
+
     intent_hint = f"用户意图：{resolved_intent}。"
     messages = [
         {"role": "system", "content": CHAT_SYSTEM_PROMPT},
@@ -125,7 +246,7 @@ def generate_chat_reply(message, history=None, intent=None):
 
     try:
         content = client.chat(messages)
-        reply = content.strip() if content else fallback_chat_reply(message, context)
+        reply = content.strip() if content else local_reply_for_intent(message, context, resolved_intent)
         return {
             "reply": reply,
             "source": model_source() if content else "SQLite 本地分析",
@@ -135,7 +256,7 @@ def generate_chat_reply(message, history=None, intent=None):
         }
     except (KeyError, TimeoutError, urllib.error.URLError, json.JSONDecodeError):
         return {
-            "reply": fallback_chat_reply(message, context),
+            "reply": local_reply_for_intent(message, context, resolved_intent),
             "source": "SQLite 本地分析",
             "intent": resolved_intent,
             "card": card,
