@@ -44,6 +44,11 @@ button { cursor: pointer; }
   width: 100vw;
   min-height: 100vh;
   background: linear-gradient(135deg, rgba(255,255,255,.58), rgba(237,246,255,.38));
+  transition: grid-template-columns 180ms ease;
+}
+
+.app-shell.sidebar-collapsed {
+  grid-template-columns: 92px minmax(0, 1fr);
 }
 
 .sidebar {
@@ -54,6 +59,53 @@ button { cursor: pointer; }
   padding: 34px 24px 26px;
   border-right: 1px solid rgba(76,96,124,.14);
   background: linear-gradient(180deg, rgba(246,251,255,.5), rgba(225,239,252,.28));
+  transition: padding 180ms ease, align-items 180ms ease;
+}
+
+.sidebar-toggle {
+  position: absolute;
+  top: 26px;
+  right: -18px;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid rgba(255,255,255,.72);
+  border-radius: 12px;
+  color: var(--blue-deep);
+  background: rgba(255,255,255,.74);
+  box-shadow: var(--inner-light), 0 12px 26px rgba(65,86,115,.12);
+  backdrop-filter: blur(18px) saturate(1.08);
+}
+.sidebar-toggle svg { width: 18px; height: 18px; }
+.sidebar-toggle:hover { background: rgba(255,255,255,.92); transform: translateY(-1px); }
+
+.app-shell.sidebar-collapsed .sidebar {
+  align-items: center;
+  padding-inline: 18px;
+}
+.app-shell.sidebar-collapsed .brand {
+  justify-content: center;
+  margin-bottom: 32px;
+}
+.app-shell.sidebar-collapsed .brand strong,
+.app-shell.sidebar-collapsed .nav-item span,
+.app-shell.sidebar-collapsed .nav-group > span,
+.app-shell.sidebar-collapsed .manager div {
+  display: none;
+}
+.app-shell.sidebar-collapsed .nav-item {
+  justify-content: center;
+  width: 52px;
+  padding: 0;
+}
+.app-shell.sidebar-collapsed .manager {
+  justify-content: center;
+}
+.app-shell.sidebar-collapsed .manager-avatar {
+  width: 42px;
+  height: 42px;
 }
 
 .brand, .nav-item, .manager, .topbar, .top-actions, .panel-title, .chat-input, .person, .drawer-head, .drawer-score, .outline-meta {
@@ -186,6 +238,26 @@ h3 { margin-bottom: 10px; font-size: 17px; }
 .bubble.assistant { justify-self: start; background: rgba(255,255,255,.68); }
 .chat-input { gap: 8px; height: 48px; margin-top: 12px; padding: 6px 6px 6px 14px; border-radius: 999px; box-shadow: var(--inner-light); }
 .chat-input button { display: grid; place-items: center; width: 36px; height: 36px; flex: 0 0 auto; border: 0; border-radius: 50%; color: #fff; background: var(--pink); }
+
+.app-shell.sidebar-collapsed .hero-grid {
+  grid-template-columns: minmax(0, 1.25fr) minmax(380px, .75fr);
+}
+
+@media (max-width: 1500px) {
+  .hero-grid,
+  .app-shell.sidebar-collapsed .hero-grid {
+    grid-template-columns: 1fr;
+  }
+  .copilot-card {
+    min-height: 360px;
+  }
+  .copilot-card.chat-active .chat-preview {
+    max-height: 240px;
+  }
+  .agent-copy, .agent-capabilities, .chat-preview, .quick-actions, .copilot-card .chat-input {
+    width: min(100%, 720px);
+  }
+}
 
 .focus-workspace { margin-top: 34px; padding: 26px; overflow: hidden; background: linear-gradient(145deg, rgba(255,255,255,.66), rgba(235,247,255,.4)); }
 .focus-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 22px; margin-bottom: 22px; }
@@ -422,10 +494,15 @@ h3 { margin-bottom: 10px; font-size: 17px; }
 @media (max-width: 980px) {
   .app-shell { grid-template-columns: 1fr; }
   .sidebar { position: static; height: auto; min-height: 0; flex-direction: row; justify-content: space-between; border-right: 0; border-bottom: 1px solid rgba(76,96,124,.14); }
+  .app-shell.sidebar-collapsed { grid-template-columns: 1fr; }
+  .app-shell.sidebar-collapsed .sidebar { align-items: center; flex-direction: row; padding: 18px 16px; }
+  .sidebar-toggle { display: none; }
   .brand { margin-bottom: 0; }
-  .brand strong { display: block; }
+  .brand strong, .app-shell.sidebar-collapsed .brand strong { display: block; }
   .nav-list { display: flex; max-width: min(62vw, 520px); overflow-x: auto; padding-bottom: 2px; }
   .nav-group, .manager { display: none; }
+  .app-shell.sidebar-collapsed .nav-item { width: auto; padding: 0 16px; }
+  .app-shell.sidebar-collapsed .nav-item span { display: inline; }
   .workspace { padding: 22px 16px; }
   .topbar, .top-actions, .focus-head, .archive-head { align-items: stretch; flex-direction: column; }
   .focus-actions { justify-content: stretch; }

@@ -1283,6 +1283,21 @@ function activateArchive() {
 }
 
 function activateUi() {
+  const shell = document.querySelector(".app-shell");
+  const sidebarToggle = document.querySelector("[data-sidebar-toggle]");
+  const setSidebarCollapsed = (collapsed) => {
+    shell?.classList.toggle("sidebar-collapsed", collapsed);
+    if (sidebarToggle) {
+      sidebarToggle.setAttribute("aria-label", collapsed ? "展开侧边栏" : "收起侧边栏");
+      sidebarToggle.setAttribute("title", collapsed ? "展开侧边栏" : "收起侧边栏");
+      sidebarToggle.innerHTML = `<i data-lucide="${collapsed ? "panel-left-open" : "panel-left-close"}"></i>`;
+      initIcons();
+    }
+    localStorage.setItem("employeeAssistantSidebarCollapsed", collapsed ? "1" : "0");
+  };
+  setSidebarCollapsed(localStorage.getItem("employeeAssistantSidebarCollapsed") === "1");
+  sidebarToggle?.addEventListener("click", () => setSidebarCollapsed(!shell?.classList.contains("sidebar-collapsed")));
+
   document.querySelectorAll(".nav-item").forEach((item) => {
     item.addEventListener("click", () => {
       document.querySelectorAll(".nav-item").forEach((button) => button.classList.remove("active"));
