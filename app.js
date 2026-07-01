@@ -694,6 +694,13 @@ function drawerField(label, value) {
   return `<div><span>${escapeHtml(label)}</span><strong>${escapeHtml(value || "待补充")}</strong></div>`;
 }
 
+function editableDrawerField(label, value, key, multiline = false) {
+  return `<div class="drawer-edit-card">
+    <span>${escapeHtml(label)}</span>
+    <strong class="editable-cell drawer-editable ${multiline ? "multiline" : ""}" contenteditable="true" spellcheck="false" data-edit-entity="employee" data-edit-key="${escapeHtml(key)}">${escapeHtml(value || "")}</strong>
+  </div>`;
+}
+
 function drawerEventItem(title, detail) {
   return `<div class="drawer-list-item"><strong>${escapeHtml(title || "未命名事项")}</strong><span>${escapeHtml(detail || "暂无补充说明")}</span></div>`;
 }
@@ -715,44 +722,52 @@ function renderDrawerArchiveDetails(employeeKey, activeTab = "basic") {
   tabs.innerHTML = tabItems.map((item) => `<button class="${item.key === activeTab ? "active" : ""}" type="button" data-drawer-profile-tab="${escapeHtml(item.key)}">${escapeHtml(item.label)}</button>`).join("");
   const panels = {
     basic: `<div class="drawer-profile-grid">
-      ${drawerField("工号", employee.employeeId)}
-      ${drawerField("部门", employee.department)}
-      ${drawerField("岗位", employee.role)}
-      ${drawerField("入职日期", employee.hireDate)}
-      ${drawerField("直属主管", employee.manager)}
+      ${editableDrawerField("姓名", employee.name, "name")}
+      ${editableDrawerField("工号", employee.employeeId, "employeeId")}
+      ${editableDrawerField("部门", employee.department, "department")}
+      ${editableDrawerField("岗位", employee.role, "role")}
+      ${editableDrawerField("入职日期", employee.hireDate, "hireDate")}
+      ${editableDrawerField("直属主管", employee.manager, "manager")}
       ${drawerField("最近沟通", latestRecord?.date)}
-      ${drawerField("合同到期", employee.contractEndDate)}
-      ${drawerField("转正日期", employee.probationEndDate)}
+      ${editableDrawerField("合同到期", employee.contractEndDate, "contractEndDate")}
+      ${editableDrawerField("转正日期", employee.probationEndDate, "probationEndDate")}
     </div>`,
     performance: `<div class="drawer-profile-grid">
-      ${drawerField("当前绩效", employee.performanceRating)}
-      ${drawerField("绩效趋势", employee.performanceTrend)}
-      ${drawerField("目标完成率", employee.goalCompletionRate ? `${employee.goalCompletionRate}%` : "")}
+      ${editableDrawerField("当前绩效", employee.performanceRating, "performanceRating")}
+      ${editableDrawerField("绩效趋势", employee.performanceTrend, "performanceTrend")}
+      ${editableDrawerField("目标完成率", employee.goalCompletionRate, "goalCompletionRate")}
       ${drawerField("AI 绩效判断", employee.performance)}
     </div>`,
     growth: `<div class="drawer-profile-grid">
       ${drawerField("生命周期阶段", employeeStage(employee))}
-      ${drawerField("导师", employee.mentor)}
-      ${drawerField("成长摘要", employee.growthSummary)}
+      ${editableDrawerField("导师", employee.mentor, "mentor")}
+      ${editableDrawerField("成长摘要", employee.growthSummary, "growthSummary", true)}
       ${drawerField("建议动作", employee.suggestedAction || employee.goal)}
     </div>`,
     awards: `<div class="drawer-profile-grid">
-      ${drawerField("获奖摘要", employee.awardsSummary)}
+      ${editableDrawerField("获奖摘要", employee.awardsSummary, "awardsSummary", true)}
       ${drawerField("正向记录", employee.awardsSummary || "暂无获奖记录")}
     </div>`,
     attendance: `<div class="drawer-profile-grid">
-      ${drawerField("30天加班", employee.overtimeHours30d ? `${employee.overtimeHours30d}h` : "")}
-      ${drawerField("30天迟到", employee.lateCount30d)}
-      ${drawerField("30天请假", employee.leaveDays30d)}
+      ${editableDrawerField("30天加班", employee.overtimeHours30d, "overtimeHours30d")}
+      ${editableDrawerField("30天迟到", employee.lateCount30d, "lateCount30d")}
+      ${editableDrawerField("30天请假", employee.leaveDays30d, "leaveDays30d")}
       ${drawerField("AI 考勤判断", employee.attendance)}
     </div>`,
     events: `<div class="drawer-list">
-      ${drawerEventItem("备注/关键事件", employee.keyEvents)}
+      <div class="drawer-edit-card wide">
+        <span>备注/关键事件</span>
+        <strong class="editable-cell drawer-editable multiline" contenteditable="true" spellcheck="false" data-edit-entity="employee" data-edit-key="keyEvents">${escapeHtml(employee.keyEvents || "")}</strong>
+      </div>
       ${drawerEventItem("风险原因", employee.reason)}
       ${drawerEventItem("最近沟通", latestRecord ? `${latestRecord.date} · ${latestRecord.summary}` : "暂无沟通记录")}
     </div>`
   };
   detail.innerHTML = panels[activeTab] || panels.basic;
+  detail.querySelectorAll("[data-edit-entity='employee']").forEach((cell) => {
+    cell.dataset.rowKey = employeeKey;
+  });
+  bindEditableCells(detail);
   tabs.querySelectorAll("[data-drawer-profile-tab]").forEach((button) => {
     button.addEventListener("click", () => renderDrawerArchiveDetails(employeeKey, button.dataset.drawerProfileTab));
   });
@@ -883,11 +898,11 @@ function bindEditableCells(scope) {
 }
 
 function setEmployeeSaveState() {
-  const button = document.querySelector("[data-save-employee-edits]");
-  if (!button) return;
   const count = Object.keys(pendingEmployeeEdits).length;
-  button.disabled = count === 0;
-  button.querySelector("span").textContent = count ? `保存修改(${count})` : "保存修改";
+  document.querySelectorAll("[data-save-employee-edits], [data-drawer-save-edits]").forEach((button) => {
+    button.disabled = count === 0;
+    button.querySelector("span").textContent = count ? `保存修改(${count})` : "保存修改";
+  });
 }
 
 async function handleEditableCellBlur(cell) {
@@ -919,17 +934,22 @@ function markEmployeeCellDirty(cell, value) {
   pendingEmployeeEdits[employeeKey] = updated;
   cell.classList.add("dirty");
   syncEmployeesFromArchive(archiveEmployees);
+  if (document.querySelector("[data-employee-drawer]")?.dataset.employee === employeeKey) {
+    const employee = employees[employeeKey];
+    document.querySelector("[data-drawer-name]").textContent = employee.name || "员工姓名";
+    document.querySelector("[data-drawer-role]").textContent = employee.role || "岗位待补充";
+    renderArchiveEmployees();
+  }
   setEmployeeSaveState();
 }
 
 async function savePendingEmployeeChanges() {
   const updates = Object.values(pendingEmployeeEdits);
   if (!updates.length) return;
-  const button = document.querySelector("[data-save-employee-edits]");
-  if (button) {
-    button.disabled = true;
-    button.querySelector("span").textContent = "保存中";
-  }
+  document.querySelectorAll("[data-save-employee-edits], [data-drawer-save-edits]").forEach((item) => {
+    item.disabled = true;
+    item.querySelector("span").textContent = "保存中";
+  });
   try {
     for (const employee of updates) {
       const result = await postJson("/api/employees", { employee });
@@ -984,20 +1004,16 @@ function renderArchiveEmployees() {
     const latestRecord = latestCommunicationForEmployee(employee);
     const level = employee.level || "待分析";
     return `<div class="archive-row archive-employee-row" data-row-key="${escapeHtml(employee.key)}" title="双击查看员工画像">
-      <span class="archive-person">${editableCell(employee.name, "employee", "name")}</span>
-      ${editableCell(employee.employeeId || "", "employee", "employeeId")}
-      ${editableCell(employee.department || "", "employee", "department")}
-      ${editableCell(employee.role || "", "employee", "role")}
+      <span class="archive-person"><strong>${escapeHtml(employee.name || "未命名")}</strong></span>
+      <span>${escapeHtml(employee.employeeId || "待补充")}</span>
+      <span>${escapeHtml(employee.department || "待补充")}</span>
+      <span>${escapeHtml(employee.role || "待补充")}</span>
       <span class="stage-pill">${escapeHtml(employeeStage(employee))}</span>
       <span class="status-pill ${escapeHtml(riskClass(employee))}">${escapeHtml(level)}</span>
       <span>${escapeHtml(latestRecord?.date || "暂无")}</span>
       <span class="row-actions"><button class="mini-action danger-action" type="button" data-delete-employee="${escapeHtml(employee.key)}"><i data-lucide="trash-2"></i><span>删除</span></button></span>
     </div>`;
   }).join("")}`;
-  table.querySelectorAll("[data-edit-entity]").forEach((cell) => {
-    cell.dataset.rowKey = cell.closest("[data-row-key]")?.dataset.rowKey || "";
-  });
-  bindEditableCells(table);
   table.querySelectorAll(".archive-employee-row[data-row-key]").forEach((row) => {
     row.addEventListener("dblclick", (event) => {
       if (event.target.closest("button")) return;
@@ -1010,6 +1026,7 @@ function renderArchiveEmployees() {
       deleteEmployee(button.dataset.deleteEmployee);
     });
   });
+  initIcons();
 }
 
 function renderCommunicationRecords() {
@@ -1287,6 +1304,7 @@ function activateUi() {
     const key = document.querySelector("[data-employee-drawer]").dataset.employee || "";
     analyzeEmployee(key, document.querySelector("[data-drawer-analyze]"));
   });
+  document.querySelector("[data-drawer-save-edits]")?.addEventListener("click", savePendingEmployeeChanges);
   document.querySelector("[data-drawer-communication-form]")?.addEventListener("submit", completeDrawerCommunication);
   document.querySelector("[data-close-outline]")?.addEventListener("click", closeOutlineModal);
   document.querySelector("[data-outline-modal-backdrop]")?.addEventListener("click", closeOutlineModal);
