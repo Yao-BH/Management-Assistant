@@ -11,3 +11,7 @@ employee_agent.db
 
 .DS_Store
 Thumbs.db
+
+node_modules/
+dist/
+pnpm-workspace.yaml

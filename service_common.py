@@ -9,4 +9,4 @@ client = DeepSeekClient()
 
 
 def model_source():
-    return f"DeepSeek · {client.model}"
+    return f"DeepSeek ({client.model})"

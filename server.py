@@ -155,7 +155,9 @@ def chat(payload: Payload):
     return generate_chat_reply(payload.message or "", payload.history or [], payload.intent)
 
 
-app.mount("/", StaticFiles(directory=str(ROOT), html=True), name="static")
+FRONTEND_DIST = ROOT / "dist"
+STATIC_DIR = FRONTEND_DIST if FRONTEND_DIST.exists() else ROOT
+app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")
 
 
 def main():
