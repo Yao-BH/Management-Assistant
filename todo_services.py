@@ -114,4 +114,5 @@ def add_action_todo(employee_key):
         "level": level_to_todo_level(employee["level"]),
         "status": "待处理",
     }
-    return {"items": database.add_todo(item)}
+    database.add_todo(item)
+    return {"archive": get_archive()}

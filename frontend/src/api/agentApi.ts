@@ -1,5 +1,15 @@
 import { postJson } from "./http";
-import type { AnalyzeResponse, ArchivePayload, Brief, ChatResponse, EmployeeProfile, EmployeeSaveResponse, OutlineResponse, TodoPayload } from "../types";
+import type {
+  AnalyzeResponse,
+  ArchivePayload,
+  Brief,
+  ChatResponse,
+  CommunicationSummaryResponse,
+  EmployeeProfile,
+  EmployeeSaveResponse,
+  OutlineResponse,
+  TodoPayload
+} from "../types";
 
 export const agentApi = {
   archive: () => postJson<ArchivePayload>("/api/archive"),
@@ -22,6 +32,8 @@ export const agentApi = {
     postJson<ArchivePayload>("/api/communication/update", { recordId, record }),
   completeCommunication: (record: Record<string, unknown>, todoId = "") =>
     postJson<ArchivePayload>("/api/communication/complete", { record, todoId }),
+  communicationSummary: (employeeKey: string, todoId = "") =>
+    postJson<CommunicationSummaryResponse>("/api/communication/summary", { employeeKey, todoId }),
   updateTodoStatus: (todoId: string, status: string) => postJson<ArchivePayload>("/api/todos/status", { todoId, status }),
   deleteTodo: (todoId: string) => postJson<ArchivePayload>("/api/todos/delete", { todoId })
 };

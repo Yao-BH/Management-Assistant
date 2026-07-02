@@ -173,3 +173,8 @@ export interface OutlineResponse {
   outline?: string[];
   source?: string;
 }
+
+export interface CommunicationSummaryResponse {
+  lines?: string[];
+  source?: string;
+}

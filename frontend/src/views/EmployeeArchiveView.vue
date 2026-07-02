@@ -162,7 +162,7 @@ async function parseWorkbook(file: File) {
             <span>摘要</span>
           </div>
           <div v-for="record in store.communicationRecords" :key="record.id || `${record.employee}-${record.date}`" class="archive-row communication">
-            <span>{{ record.employee || record.employeeName || store.employeeName(record.employeeKey) }}</span>
+            <span><strong class="communication-employee-name">{{ record.employee || record.employeeName || store.employeeName(record.employeeKey) }}</strong></span>
             <span>{{ record.date || "未记录" }}</span>
             <span>{{ record.type || "沟通" }}</span>
             <span>{{ record.summary || "未填写摘要" }}</span>

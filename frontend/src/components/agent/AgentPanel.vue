@@ -55,7 +55,7 @@ watch(
         <div v-if="message.role === 'assistant'" v-html="formatAssistantMessage(message.text)"></div>
         <template v-else>{{ message.text }}</template>
       </div>
-      <div v-if="store.chatLoading" class="bubble assistant">正在结合团队上下文分析...</div>
+      <div v-if="store.chatLoading" class="bubble assistant">正在解析数据，AI分析中...</div>
     </div>
 
     <div class="quick-actions" aria-label="AI 快捷动作">

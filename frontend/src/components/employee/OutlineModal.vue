@@ -10,8 +10,8 @@ const store = useAgentStore();
   <section class="outline-modal panel" :aria-hidden="store.outlineModalOpen ? 'false' : 'true'">
     <div class="panel-title">
       <div>
-        <p class="eyebrow">Generated Outline</p>
-        <h2>{{ store.selectedEmployee?.name || "员工" }} 1 对 1 沟通提纲</h2>
+        <p class="eyebrow">{{ store.outlineEyebrow }}</p>
+        <h2>{{ store.outlineTitle }}</h2>
       </div>
       <button class="icon-btn" type="button" aria-label="关闭沟通提纲" @click="store.outlineModalOpen = false"><X /></button>
     </div>

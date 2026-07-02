@@ -1,12 +1,18 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { MessageSquareText, RefreshCw, Trash2, UserRoundSearch, WandSparkles } from "lucide-vue-next";
+import { CheckCircle2, FileText, MessageSquareText, Play, RefreshCw, Trash2, UserRoundSearch } from "lucide-vue-next";
 import { useAgentStore } from "../stores/agentStore";
-import { todoAction, todoEvidence, todoLevelLabel, todoStatusClass } from "../utils/format";
+import { signalText, todoAction, todoEvidence, todoLevelLabel, todoStatusClass } from "../utils/format";
 
 const store = useAgentStore();
 const selectedTodo = computed(() => store.smartTodos.find((todo) => todo.id === store.selectedTodoId));
 const selectedEmployee = computed(() => store.employees.find((employee) => employee.key === selectedTodo.value?.employeeKey));
+const selectedEvidence = computed(() => {
+  const employee = selectedEmployee.value;
+  if (!employee) return selectedTodo.value?.tags || [];
+  const signalEvidence = (employee.riskSignals || []).map(signalText).filter(Boolean);
+  return signalEvidence.length ? signalEvidence : employee.evidence || selectedTodo.value?.tags || [];
+});
 const latestRecords = computed(() =>
   selectedTodo.value?.employeeKey
     ? store.communicationRecords
@@ -84,12 +90,22 @@ const groups = computed(() => [
             </button>
           </section>
 
-          <section class="todo-glass-section">
-            <h3>风险依据</h3>
-            <p>{{ todoEvidence(selectedTodo) }}</p>
-            <div v-if="selectedTodo.tags?.length" class="drawer-tags">
-              <span v-for="tag in selectedTodo.tags" :key="tag">{{ tag }}</span>
-            </div>
+          <section class="todo-profile-snapshot">
+            <article>
+              <h3>AI 风险解释</h3>
+              <p>{{ selectedEmployee?.reason || todoEvidence(selectedTodo) }}</p>
+            </article>
+            <article>
+              <h3>关键证据</h3>
+              <div class="drawer-tags">
+                <span v-for="item in selectedEvidence.slice(0, 4)" :key="item">{{ item }}</span>
+                <span v-if="!selectedEvidence.length">暂无关键证据</span>
+              </div>
+            </article>
+            <article>
+              <h3>生命周期</h3>
+              <p><strong>{{ selectedEmployee?.lifecycle?.stage || "待分析" }}</strong>：{{ selectedEmployee?.lifecycle?.detail || "等待 AI 结合入职、合同、转正和沟通记录判断。" }}</p>
+            </article>
           </section>
 
           <section class="todo-glass-section next-action-section">
@@ -110,14 +126,16 @@ const groups = computed(() => [
           </section>
 
           <div class="todo-actions">
-            <button type="button" @click="selectedTodo.employeeKey && store.openEmployeeDrawer(selectedTodo.employeeKey, false)">
-              <UserRoundSearch /><span>查看员工画像</span>
+            <button type="button" @click="store.updateTodoStatus(selectedTodo.id, '处理中')">
+              <Play /><span>开始处理</span>
             </button>
-            <button type="button" @click="selectedTodo.employeeKey && store.generateOutline(selectedTodo.employeeKey)">
-              <WandSparkles /><span>生成沟通提纲</span>
+            <button type="button" @click="selectedTodo.employeeKey && store.openEmployeeDrawer(selectedTodo.employeeKey, true)">
+              <CheckCircle2 /><span>记录沟通并完成</span>
             </button>
-            <button type="button" @click="store.updateTodoStatus(selectedTodo.id, '已完成')">标记完成</button>
             <button type="button" @click="store.deleteTodo(selectedTodo.id)"><Trash2 /><span>删除</span></button>
+            <button type="button" @click="selectedTodo.employeeKey && store.generateCommunicationSummary(selectedTodo.employeeKey, selectedTodo.id)">
+              <FileText /><span>生成沟通概要</span>
+            </button>
           </div>
         </template>
       </article>

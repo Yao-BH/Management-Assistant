@@ -19,6 +19,7 @@ from agent_services import (
     complete_communication_workflow,
     generate_brief,
     generate_chat_reply,
+    generate_communication_summary,
     generate_employee_profile,
     generate_outline,
     generate_todos,
@@ -97,6 +98,11 @@ def communication_update(payload: Payload):
 @app.post("/api/communication/complete")
 def communication_complete(payload: Payload):
     return complete_communication_workflow(payload.record or {}, payload.todoId)
+
+
+@app.post("/api/communication/summary")
+def communication_summary(payload: Payload):
+    return generate_communication_summary(payload.employeeKey, payload.todoId)
 
 
 @app.post("/api/brief")

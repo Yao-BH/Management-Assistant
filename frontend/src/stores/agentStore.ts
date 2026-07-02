@@ -32,6 +32,10 @@ function normalizeArchive(payload: ArchivePayload = {}) {
   };
 }
 
+function archiveFromResponse(response: ArchivePayload & { archive?: ArchivePayload } = {}) {
+  return response.archive || response;
+}
+
 export const useAgentStore = defineStore("agent", {
   state: () => ({
     employees: [] as Employee[],
@@ -52,6 +56,8 @@ export const useAgentStore = defineStore("agent", {
     employeeModalOpen: false,
     communicationModalOpen: false,
     outlineModalOpen: false,
+    outlineTitle: "1 对 1 沟通提纲",
+    outlineEyebrow: "Generated Outline",
     outlineLines: [] as string[],
     outlineSource: "等待生成",
     assistantHistory: [
@@ -193,7 +199,7 @@ export const useAgentStore = defineStore("agent", {
     },
     async addActionTodo(employeeKey = this.focusQueue[0]?.employeeKey || "") {
       if (!employeeKey) return;
-      this.applyArchive(await agentApi.actionTodo(employeeKey));
+      this.applyArchive(archiveFromResponse(await agentApi.actionTodo(employeeKey)));
       this.pushAgentEvent(`已将 ${this.employeeName(employeeKey)} 加入管理待办。`);
     },
     openEmployeeDrawer(employeeKey: string, editable = false) {
@@ -229,12 +235,31 @@ export const useAgentStore = defineStore("agent", {
       if (!employeeKey) return;
       this.selectedEmployeeKey = employeeKey;
       this.outlineModalOpen = true;
+      this.outlineTitle = `${this.employeeName(employeeKey)} 1 对 1 沟通提纲`;
+      this.outlineEyebrow = "Generated Outline";
       this.outlineSource = "正在分析";
       this.outlineLines = ["正在结合员工画像、风险信号、待办事项和最近沟通记录生成提纲..."];
       const employee = this.employees.find((item) => item.key === employeeKey);
       try {
         const result = await agentApi.outline(employeeKey, employee);
         this.outlineLines = result.lines || result.outline || [];
+        this.outlineSource = result.source || "已生成";
+      } catch {
+        this.outlineSource = "生成失败";
+        this.outlineLines = ["暂时无法连接模型服务，请稍后重试。"];
+      }
+    },
+    async generateCommunicationSummary(employeeKey = this.selectedTodo?.employeeKey || this.selectedEmployeeKey, todoId = this.selectedTodoId) {
+      if (!employeeKey) return;
+      this.selectedEmployeeKey = employeeKey;
+      this.outlineModalOpen = true;
+      this.outlineTitle = `${this.employeeName(employeeKey)} 沟通概要`;
+      this.outlineEyebrow = "AI Communication Brief";
+      this.outlineSource = "正在分析";
+      this.outlineLines = ["正在独立分析员工画像、当前待办和最近沟通记录..."];
+      try {
+        const result = await agentApi.communicationSummary(employeeKey, todoId);
+        this.outlineLines = result.lines || [];
         this.outlineSource = result.source || "已生成";
       } catch {
         this.outlineSource = "生成失败";
@@ -280,22 +305,22 @@ export const useAgentStore = defineStore("agent", {
       this.pushAgentEvent("已删除员工档案，并同步关注队列。");
     },
     async saveCommunication(record: Record<string, unknown>) {
-      this.applyArchive(await agentApi.saveCommunication(record));
+      this.applyArchive(archiveFromResponse(await agentApi.saveCommunication(record)));
       this.communicationModalOpen = false;
       this.pushAgentEvent("已记录沟通信息，并同步风险证据。");
     },
     async completeCommunication(record: Record<string, unknown>, todoId = "") {
-      this.applyArchive(await agentApi.completeCommunication(record, todoId));
+      this.applyArchive(archiveFromResponse(await agentApi.completeCommunication(record, todoId)));
       this.closeEmployeeDrawer();
       this.pushAgentEvent("已完成沟通闭环，并更新待办状态。");
     },
     async updateTodoStatus(todoId: string, status: string) {
-      this.applyArchive(await agentApi.updateTodoStatus(todoId, status));
+      this.applyArchive(archiveFromResponse(await agentApi.updateTodoStatus(todoId, status)));
       this.selectedTodoId = todoId;
     },
     async deleteTodo(todoId: string) {
-      this.applyArchive(await agentApi.deleteTodo(todoId));
-      if (this.selectedTodoId === todoId) this.selectedTodoId = "";
+      this.applyArchive(archiveFromResponse(await agentApi.deleteTodo(todoId)));
+      if (this.selectedTodoId === todoId) this.selectedTodoId = this.smartTodos[0]?.id || "";
     },
     pushAgentEvent(text: string) {
       if (!text) return;
