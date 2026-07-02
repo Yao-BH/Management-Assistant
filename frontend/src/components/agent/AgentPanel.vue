@@ -48,8 +48,7 @@ watch(
       <div v-if="!isChatActive" class="agent-hero">
         <img class="ai-orb" :src="aiOrb" alt="小达 AI 图标" />
         <div>
-          <h2>您好，我是您的管理助手</h2>
-          <p>有问题随时问我</p>
+          <h2>你好，我是小达，今天有什么计划？</h2>
         </div>
       </div>
 
