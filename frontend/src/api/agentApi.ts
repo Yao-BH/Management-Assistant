@@ -11,12 +11,63 @@ import type {
   TodoPayload
 } from "../types";
 
+type ChatStreamHandlers = {
+  onMeta?: (payload: ChatResponse) => void;
+  onDelta?: (text: string) => void;
+  onDone?: (payload: ChatResponse) => void;
+};
+
+async function postStream(url: string, payload: Record<string, unknown>, handlers: ChatStreamHandlers = {}) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  if (!response.ok || !response.body) {
+    const detail = await response.text().catch(() => "");
+    throw new Error(`${url} failed: ${detail || response.status}`);
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let donePayload: ChatResponse = {};
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      const event = JSON.parse(line) as ChatResponse & { type?: string; text?: string };
+      if (event.type === "meta") handlers.onMeta?.(event);
+      if (event.type === "delta" && event.text) handlers.onDelta?.(event.text);
+      if (event.type === "done") {
+        donePayload = event;
+        handlers.onDone?.(event);
+      }
+    }
+  }
+
+  if (buffer.trim()) {
+    const event = JSON.parse(buffer) as ChatResponse & { type?: string; text?: string };
+    if (event.type === "done") donePayload = event;
+  }
+
+  return donePayload;
+}
+
 export const agentApi = {
   archive: () => postJson<ArchivePayload>("/api/archive"),
   brief: () => postJson<Brief>("/api/brief"),
   todos: () => postJson<TodoPayload>("/api/todos"),
   chat: (message: string, history: unknown[] = [], intent = "") =>
     postJson<ChatResponse>("/api/chat", { message, history, intent }),
+  chatStream: (message: string, history: unknown[] = [], intent = "", handlers: ChatStreamHandlers = {}) =>
+    postStream("/api/chat/stream", { message, history, intent }, handlers),
   profile: (employeeKey: string, employee?: unknown) =>
     postJson<EmployeeProfile>("/api/profile", { employeeKey, employee }),
   analyze: (employeeKey: string) => postJson<AnalyzeResponse>("/api/analyze", { employeeKey }),

@@ -1,17 +1,33 @@
 import json
 import urllib.error
 
-from context_services import build_team_context
+import database
 from prompts import CHAT_SYSTEM_PROMPT
 from service_common import client, model_source
+
+
+EMPTY_CONTEXT = {
+    "summary": {},
+    "employees": [],
+    "communication_records": [],
+    "todos": [],
+    "risk_signals": [],
+}
 
 
 def infer_intent(message, explicit_intent=None):
     if explicit_intent:
         return explicit_intent
     text = message or ""
-    if any(word in text for word in ("你能做什么", "有什么功能", "功能", "你是谁", "怎么用", "能干什么")):
+    stripped = text.strip()
+    if stripped in ("你好", "您好", "嗨", "hi", "hello", "Hello", "HI") or any(word in text for word in ("在吗", "小达")):
+        return "greeting"
+    if any(word in text for word in ("你能做什么", "有什么功能", "功能", "你是谁", "怎么用", "能干什么", "你会什么")):
         return "capability_query"
+    if any(word in text for word in ("怎么办", "怎么处理", "如何", "建议", "思路", "方法")) and any(
+        word in text for word in ("管理", "员工", "团队", "焦虑", "冲突", "绩效", "沟通", "氛围", "压力")
+    ):
+        return "management_advice"
     if any(word in text for word in ("所有", "全部", "全员", "每个")) and any(word in text for word in ("风险", "状态", "员工")):
         return "risk_overview"
     if any(word in text for word in ("团队", "整体", "概况", "总览", "多少人", "人数")):
@@ -27,6 +43,123 @@ def infer_intent(message, explicit_intent=None):
     return "general"
 
 
+def mentioned_employees(message, limit=5):
+    text = message or ""
+    matches = []
+    seen = set()
+    for item in database.list_employee_directory():
+        keys = [item.get("name"), item.get("employeeId"), item.get("key")]
+        if any(value and str(value) in text for value in keys):
+            if item["key"] not in seen:
+                matches.append(item)
+                seen.add(item["key"])
+        if len(matches) >= limit:
+            break
+    return matches
+
+
+def compact_employee(employee):
+    if not employee:
+        return {}
+    return {
+        "key": employee.get("key"),
+        "name": employee.get("name"),
+        "employeeId": employee.get("employeeId"),
+        "department": employee.get("department"),
+        "role": employee.get("role"),
+        "jobLevel": employee.get("jobLevel"),
+        "manager": employee.get("manager"),
+        "level": employee.get("level"),
+        "risk": employee.get("risk"),
+        "reason": employee.get("reason"),
+        "evidence": employee.get("evidence", [])[:3],
+        "riskSignals": employee.get("riskSignals", [])[:3],
+        "performance": employee.get("performance"),
+        "attendance": employee.get("attendance"),
+        "communication": employee.get("communication"),
+        "lifecycle": employee.get("lifecycle"),
+        "suggestedAction": employee.get("suggestedAction"),
+        "analysisStatus": employee.get("analysisStatus"),
+    }
+
+
+def employee_context(matches):
+    employees = [compact_employee(database.get_employee(item["key"])) for item in matches]
+    keys = [item.get("key") for item in employees if item.get("key")]
+    records = []
+    todos = []
+    signals = []
+    for key in keys:
+        records.extend(database.list_communication_records(key, limit=5))
+        todos.extend(database.list_todos(key, limit=5))
+        signals.extend(database.list_risk_signals(key)[:8])
+    return {
+        "summary": {"matched_employee_count": len(employees)},
+        "employees": employees,
+        "communication_records": records[:12],
+        "todos": todos[:12],
+        "risk_signals": signals[:20],
+    }
+
+
+def team_snapshot_context(intent):
+    if intent == "risk_overview":
+        roster = database.list_employee_directory()
+        return {
+            "summary": database.team_summary(),
+            "employees": roster,
+            "communication_records": [],
+            "todos": [],
+            "risk_signals": [],
+            "scope": "risk_roster_minimal",
+        }
+
+    focus = [compact_employee(employee) for employee in database.list_focus_employees(5)]
+    focus_keys = {employee.get("key") for employee in focus if employee.get("key")}
+    todos = [
+        todo
+        for todo in database.list_todos(limit=8)
+        if not todo.get("employeeKey") or todo.get("employeeKey") in focus_keys
+    ][:5]
+    return {
+        "summary": database.team_summary(),
+        "employees": focus,
+        "communication_records": [],
+        "todos": todos,
+        "risk_signals": [signal for signal in database.list_risk_signals()[:16] if not focus_keys or signal.get("employeeKey") in focus_keys][:10],
+        "scope": intent,
+    }
+
+
+def build_chat_context(message, intent):
+    if intent in ("greeting", "capability_query"):
+        return {**EMPTY_CONTEXT, "scope": "agent_capability_only"}
+    if intent == "management_advice":
+        return {**EMPTY_CONTEXT, "scope": "management_knowledge_only"}
+
+    matches = mentioned_employees(message)
+    if matches:
+        context = employee_context(matches)
+        context["scope"] = "matched_employee_records"
+        return context
+
+    if intent in ("team_summary", "risk_overview", "today_priority", "management_actions", "communication_outline"):
+        return team_snapshot_context(intent)
+
+    return {**EMPTY_CONTEXT, "scope": "general_no_database_match"}
+
+
+def chat_context_for_model(context):
+    return {
+        "summary": context.get("summary", {}),
+        "scope": context.get("scope"),
+        "employees": context.get("employees", [])[:8],
+        "todos": context.get("todos", [])[:8],
+        "communication_records": context.get("communication_records", [])[:8],
+        "risk_signals": context.get("risk_signals", [])[:20],
+    }
+
+
 def focus_employees(context):
     employees = context.get("employees", [])
     focus = [
@@ -37,14 +170,32 @@ def focus_employees(context):
     return sorted(focus, key=lambda item: item.get("risk", 0), reverse=True)
 
 
-def format_capability_reply():
+def format_greeting_reply(context):
+    summary = context.get("summary", {})
+    focus = focus_employees(context)
+    top_names = "、".join(employee["name"] for employee in focus[:2])
+    if top_names:
+        return (
+            f"你好，我在。当前团队共 {summary.get('team_size', 0)} 人，"
+            f"{summary.get('focus_count', 0)} 人需要关注，优先可以先看 {top_names}。\n"
+            "你可以直接问我：今天先处理谁、某位员工为什么有风险，或者帮我生成管理动作。"
+        )
     return (
-        "**我可以帮你快速判断团队管理优先级。**\n"
-        "1. 判断今天优先关注谁\n"
-        "2. 解释员工风险原因\n"
-        "3. 生成管理动作和待办建议\n"
-        "4. 辅助准备 1 对 1 沟通\n"
-        "你可以直接问：今天先处理谁？或李四为什么有风险？"
+        f"你好，我在。当前团队共 {summary.get('team_size', 0)} 人，暂未识别到明确高风险对象。\n"
+        "你可以问我团队概况、员工风险原因，或让小达帮你生成今天的管理动作。"
+    )
+
+
+def format_capability_reply(context):
+    summary = context.get("summary", {})
+    focus = focus_employees(context)
+    top_names = "、".join(employee["name"] for employee in focus[:3]) or "暂无明确重点对象"
+    return (
+        f"**我主要帮你把团队风险变成可执行动作。**\n"
+        f"1. 看优先级：当前 {summary.get('focus_count', 0)} 人需要关注，优先对象是 {top_names}\n"
+        f"2. 查原因：解释某位员工的风险信号、证据和建议动作\n"
+        f"3. 推进闭环：把风险转成待办、1 对 1 提纲和跟进安排\n"
+        "你可以直接问：今天先处理谁？或者范宁为什么有风险？"
     )
 
 
@@ -162,8 +313,10 @@ def evidence_labels(employee):
 
 
 def local_reply_for_intent(message, context, intent):
+    if intent == "greeting":
+        return format_greeting_reply(context)
     if intent == "capability_query":
-        return format_capability_reply()
+        return format_capability_reply(context)
     if intent == "team_summary":
         return format_team_summary(context)
     if intent == "risk_overview":
@@ -183,6 +336,16 @@ def local_reply_for_intent(message, context, intent):
 
 
 def build_reply_card(message, context, intent):
+    if intent in ("greeting", "capability_query", "team_summary", "management_advice", "general"):
+        return {
+            "intent": intent,
+            "title": "管理助手问答",
+            "conclusion": "小达会根据问题类型决定是否查询员工数据，并给出管理建议。",
+            "evidence": [],
+            "action": "可以继续追问具体员工、风险原因、今日优先级或管理方法。",
+            "employeeKey": "",
+            "tone": "low",
+        }
     employee = priority_employee(context) if intent == "today_priority" else select_employee(message, context)
     if not employee:
         return {
@@ -213,6 +376,8 @@ def build_reply_card(message, context, intent):
 
 
 def fallback_chat_reply(message, context):
+    if len((message or "").strip()) <= 6:
+        return format_greeting_reply(context)
     focus = [employee for employee in context.get("employees", []) if employee.get("level") in ("高风险", "中风险")]
     for employee in context.get("employees", []):
         if employee.get("name") and employee["name"] in message:
@@ -240,16 +405,20 @@ def fallback_chat_reply(message, context):
             "3. 对待分析员工运行分析"
         )
     return (
-        "**我可以基于员工档案、沟通记录和智能待办回答。**\n"
-        "1. 你可以问：今天优先关注谁？\n"
-        "2. 或问：某位员工为什么有风险？"
+        f"我理解你的问题是想判断下一步怎么管。当前可参考的数据是："
+        f"团队 {context.get('summary', {}).get('team_size', 0)} 人，"
+        f"{context.get('summary', {}).get('focus_count', 0)} 人需要关注，"
+        f"待办 {context.get('summary', {}).get('pending_actions', 0)} 项。\n"
+        "你可以把问题再具体一点，比如问“今天先处理谁”或“某位员工为什么有风险”，我会直接给判断和动作。"
     )
 
 
 def suggest_actions(message, context, intent=None):
+    if intent in ("greeting", "capability_query", "management_advice", "general"):
+        return []
     employee = priority_employee(context) if intent == "today_priority" else select_employee(message, context)
     if not employee:
-        return [{"type": "add_todo", "label": "加入待办"}]
+        return []
     return [
         {"type": "outline", "label": "生成沟通提纲", "employeeKey": employee["key"]},
         {"type": "todo", "label": "加入待办", "employeeKey": employee["key"]},
@@ -258,13 +427,41 @@ def suggest_actions(message, context, intent=None):
 
 
 def sanitize_reply(text):
-    return (
+    cleaned = (
         (text or "")
         .replace("###", "")
         .replace("##", "")
         .replace("#", "")
         .strip()
     )
+    if cleaned.startswith("*") and not cleaned.startswith("**"):
+        cleaned = cleaned.lstrip("*").strip()
+    if cleaned.endswith("*") and not cleaned.endswith("**"):
+        cleaned = cleaned.rstrip("*").strip()
+    return cleaned
+
+
+def build_chat_payload(message, history=None, intent=None):
+    resolved_intent = infer_intent(message, intent)
+    context = build_chat_context(message, resolved_intent)
+    card = build_reply_card(message, context, resolved_intent)
+    intent_hint = (
+        f"系统初步识别的用户意图：{resolved_intent}。"
+        f"本次上下文范围：{context.get('scope', 'unknown')}。"
+        "这只是辅助判断，不要机械套模板；请优先理解用户原话并自然回答。"
+        "如果 scope 是 agent_capability_only 或 management_knowledge_only，说明本轮没有查询员工数据库；不要声称看到了具体员工数据。"
+        "如果 scope 是 matched_employee_records，只基于给出的员工、沟通、待办和风险信号回答。"
+        "如果 scope 是 general_no_database_match 且用户问具体员工信息，请先请用户补充姓名或工号。"
+        "如果用户只是打招呼或问你能做什么，请像真实助手一样简短回应。"
+        "不要输出“我可以基于员工档案...”这类泛泛说明，除非用户明确询问能力。"
+    )
+    messages = [
+        {"role": "system", "content": CHAT_SYSTEM_PROMPT},
+        {"role": "user", "content": intent_hint + "\n团队上下文：" + json.dumps(chat_context_for_model(context), ensure_ascii=False)},
+    ]
+    messages.extend((history or [])[-4:])
+    messages.append({"role": "user", "content": message})
+    return context, resolved_intent, card, messages
 
 
 def generate_chat_reply(message, history=None, intent=None):
@@ -277,35 +474,62 @@ def generate_chat_reply(message, history=None, intent=None):
             "actions": [],
         }
 
-    context = build_team_context()
-    resolved_intent = infer_intent(message, intent)
-    card = build_reply_card(message, context, resolved_intent)
-    intent_hint = (
-        f"系统初步识别的用户意图：{resolved_intent}。"
-        "这只是辅助判断，不要机械套模板；请优先理解用户原话并自然回答。"
-    )
-    messages = [
-        {"role": "system", "content": CHAT_SYSTEM_PROMPT},
-        {"role": "user", "content": intent_hint + "\n团队上下文：" + json.dumps(context, ensure_ascii=False)},
-    ]
-    messages.extend((history or [])[-6:])
-    messages.append({"role": "user", "content": message})
+    context, resolved_intent, card, messages = build_chat_payload(message, history, intent)
 
     try:
-        content = client.chat(messages)
-        reply = sanitize_reply(content) if content else local_reply_for_intent(message, context, resolved_intent)
+        content = client.chat(messages, timeout=12, max_tokens=360, temperature=0.6)
+        reply = sanitize_reply(content) if content else "模型暂时没有返回有效内容，请稍后再试。"
         return {
             "reply": reply,
-            "source": model_source() if content else "SQLite 本地分析",
+            "source": model_source() if content else "模型未返回",
             "intent": resolved_intent,
             "card": card,
             "actions": suggest_actions(message, context, resolved_intent),
         }
     except (KeyError, TimeoutError, urllib.error.URLError, json.JSONDecodeError):
         return {
-            "reply": sanitize_reply(local_reply_for_intent(message, context, resolved_intent)),
-            "source": "SQLite 本地分析",
+            "reply": "模型连接超时或暂时不可用，请稍后再试。",
+            "source": "模型未返回",
             "intent": resolved_intent,
             "card": card,
             "actions": suggest_actions(message, context, resolved_intent),
         }
+
+
+def generate_chat_reply_stream(message, history=None, intent=None):
+    if not message:
+        yield {"type": "meta", "source": "本地智能模板", "intent": "empty", "card": None, "actions": []}
+        yield {"type": "delta", "text": "请输入你想了解的员工、风险或管理动作。"}
+        yield {"type": "done"}
+        return
+
+    context, resolved_intent, card, messages = build_chat_payload(message, history, intent)
+    actions = suggest_actions(message, context, resolved_intent)
+    yield {
+        "type": "meta",
+        "source": model_source() if client.enabled else "模型未启用",
+        "intent": resolved_intent,
+        "card": card,
+        "actions": actions,
+    }
+
+    streamed = False
+    try:
+        for chunk in client.chat_stream(messages, timeout=18, max_tokens=360, temperature=0.6):
+            streamed = True
+            yield {"type": "delta", "text": chunk}
+    except (KeyError, TimeoutError, urllib.error.URLError, json.JSONDecodeError):
+        streamed = False
+
+    if not streamed:
+        message_text = "模型暂时没有返回有效内容，请稍后再试。"
+        for index in range(0, len(message_text), 8):
+            yield {"type": "delta", "text": message_text[index : index + 8]}
+
+    yield {
+        "type": "done",
+        "source": model_source() if streamed else "模型未返回",
+        "intent": resolved_intent,
+        "card": card,
+        "actions": actions,
+    }

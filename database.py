@@ -267,6 +267,81 @@ def row_to_todo(row):
     }
 
 
+def list_employee_directory():
+    with connect() as db:
+        rows = db.execute(
+            """
+            SELECT key, name, employee_id, department, role, level, risk
+            FROM employees
+            ORDER BY name
+            """
+        ).fetchall()
+    return [
+        {
+            "key": row["key"],
+            "name": row["name"],
+            "employeeId": row["employee_id"] or "",
+            "department": row["department"] or "",
+            "role": row["role"] or "",
+            "level": row["level"] or "待分析",
+            "risk": row["risk"] or 0,
+        }
+        for row in rows
+    ]
+
+
+def list_focus_employees(limit=8):
+    with connect() as db:
+        rows = db.execute(
+            """
+            SELECT * FROM employees
+            WHERE level IN ('高风险', '中风险')
+               OR risk >= 40
+               OR model_required = 1
+               OR analysis_status IN ('待模型精算', '待分析')
+            ORDER BY risk DESC, updated_at DESC, name
+            LIMIT ?
+            """,
+            (limit,),
+        ).fetchall()
+    return [row_to_employee(row) for row in rows]
+
+
+def team_summary():
+    with connect() as db:
+        team_size = db.execute("SELECT COUNT(*) AS count FROM employees").fetchone()["count"]
+        focus_count = db.execute(
+            """
+            SELECT COUNT(*) AS count FROM employees
+            WHERE level IN ('高风险', '中风险')
+               OR risk >= 40
+               OR model_required = 1
+               OR analysis_status IN ('待模型精算', '待分析')
+            """
+        ).fetchone()["count"]
+        pending_actions = db.execute(
+            """
+            SELECT COUNT(*) AS count FROM todos
+            WHERE status NOT IN ('已完成', '已忽略', '关闭', '已关闭')
+            """
+        ).fetchone()["count"]
+        covered = db.execute(
+            """
+            SELECT COUNT(DISTINCT COALESCE(NULLIF(employee_key, ''), employee_name)) AS count
+            FROM communication_records
+            WHERE COALESCE(NULLIF(employee_key, ''), employee_name) IS NOT NULL
+              AND COALESCE(NULLIF(employee_key, ''), employee_name) != ''
+            """
+        ).fetchone()["count"]
+    coverage = round((covered / team_size) * 100) if team_size else 0
+    return {
+        "team_size": team_size,
+        "focus_count": focus_count,
+        "pending_actions": pending_actions,
+        "communication_coverage": f"{coverage}%",
+    }
+
+
 def list_employees():
     with connect() as db:
         rows = db.execute("SELECT * FROM employees ORDER BY updated_at DESC, name").fetchall()
@@ -520,9 +595,18 @@ def save_analysis(employee_key, profile):
     return get_employee(employee_key)
 
 
-def list_communication_records():
+def list_communication_records(employee_key=None, limit=None):
     with connect() as db:
-        rows = db.execute("SELECT * FROM communication_records ORDER BY date DESC, id DESC").fetchall()
+        sql = "SELECT * FROM communication_records"
+        params = []
+        if employee_key:
+            sql += " WHERE employee_key = ?"
+            params.append(employee_key)
+        sql += " ORDER BY date DESC, id DESC"
+        if limit:
+            sql += " LIMIT ?"
+            params.append(limit)
+        rows = db.execute(sql, params).fetchall()
         return [row_to_record(row) for row in rows]
 
 
@@ -599,11 +683,17 @@ def delete_communication_record(record_id):
         return record
 
 
-def list_todos():
+def list_todos(employee_key=None, limit=None):
     with connect() as db:
+        where = "WHERE employee_key = ?" if employee_key else ""
+        params = [employee_key] if employee_key else []
+        limit_sql = " LIMIT ?" if limit else ""
+        if limit:
+            params.append(limit)
         rows = db.execute(
-            """
+            f"""
             SELECT * FROM todos
+            {where}
             ORDER BY
                 CASE status
                     WHEN '待处理' THEN 0
@@ -614,7 +704,10 @@ def list_todos():
                 END,
                 priority,
                 created_at DESC
+            {limit_sql}
             """
+            ,
+            params,
         ).fetchall()
         return [row_to_todo(row) for row in rows]
 

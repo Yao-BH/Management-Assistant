@@ -1,9 +1,11 @@
+import json
 import os
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -19,6 +21,7 @@ from agent_services import (
     complete_communication_workflow,
     generate_brief,
     generate_chat_reply,
+    generate_chat_reply_stream,
     generate_communication_summary,
     generate_employee_profile,
     generate_outline,
@@ -168,6 +171,15 @@ def action_todo(payload: Payload):
 @app.post("/api/chat")
 def chat(payload: Payload):
     return generate_chat_reply(payload.message or "", payload.history or [], payload.intent)
+
+
+@app.post("/api/chat/stream")
+def chat_stream(payload: Payload):
+    def events():
+        for event in generate_chat_reply_stream(payload.message or "", payload.history or [], payload.intent):
+            yield json.dumps(event, ensure_ascii=False) + "\n"
+
+    return StreamingResponse(events(), media_type="application/x-ndjson")
 
 
 FRONTEND_DIST = ROOT / "dist"

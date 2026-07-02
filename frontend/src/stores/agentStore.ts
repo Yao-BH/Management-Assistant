@@ -167,20 +167,50 @@ export const useAgentStore = defineStore("agent", {
           role: item.role,
           content: item.text
         }));
-        const reply = await agentApi.chat(text, history, intent);
-        const assistantText = reply.reply || reply.answer || reply.message || "我暂时没有生成有效回复。";
-        this.assistantHistory.push({
+        const assistantMessage: ChatMessage = {
           role: "assistant",
-          text: assistantText,
-          source: reply.source,
-          intent: reply.intent,
-          card: reply.card,
-          actions: reply.actions || []
+          text: "",
+          intent,
+          card: null,
+          actions: []
+        };
+        this.assistantHistory.push(assistantMessage);
+        const assistantIndex = this.assistantHistory.length - 1;
+        const done = await agentApi.chatStream(text, history, intent, {
+          onMeta: (payload) => {
+            const current = this.assistantHistory[assistantIndex];
+            if (!current) return;
+            current.source = payload.source;
+            current.intent = payload.intent || intent;
+            current.card = payload.card;
+            current.actions = payload.actions || [];
+          },
+          onDelta: (chunk) => {
+            const current = this.assistantHistory[assistantIndex];
+            if (current) current.text += chunk;
+          },
+          onDone: (payload) => {
+            const current = this.assistantHistory[assistantIndex];
+            if (!current) return;
+            current.source = payload.source || current.source;
+            current.intent = payload.intent || current.intent;
+            current.card = payload.card || current.card;
+            current.actions = payload.actions || current.actions || [];
+          }
         });
+        const current = this.assistantHistory[assistantIndex];
+        if (current && !current.text.trim()) {
+          current.text = done.reply || done.answer || done.message || "我暂时没有生成有效回复，请再试一次。";
+        }
         this.assistantHistory = [this.assistantHistory[0], ...this.assistantHistory.slice(1).slice(-maxAssistantHistory)];
-        this.pushAgentEvent(`Agent 已识别“${reply.intent || intent || "团队问答"}”意图并完成回复。`);
+        this.pushAgentEvent(`Agent 已完成“${done.intent || intent || "团队问答"}”回复。`);
       } catch {
-        this.assistantHistory.push({ role: "assistant", text: "我暂时无法连接模型服务，请稍后再试。" });
+        const last = this.assistantHistory[this.assistantHistory.length - 1];
+        if (last?.role === "assistant" && !last.text) {
+          last.text = "我暂时无法连接模型服务，请稍后再试。";
+        } else {
+          this.assistantHistory.push({ role: "assistant", text: "我暂时无法连接模型服务，请稍后再试。" });
+        }
         this.assistantHistory = [this.assistantHistory[0], ...this.assistantHistory.slice(1).slice(-maxAssistantHistory)];
       } finally {
         this.chatLoading = false;

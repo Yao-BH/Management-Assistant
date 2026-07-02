@@ -21,7 +21,7 @@ class DeepSeekClient:
     def enabled(self):
         return bool(self.api_key)
 
-    def chat(self, messages, response_format=None, timeout=30):
+    def chat(self, messages, response_format=None, timeout=30, max_tokens=None, temperature=None):
         if not self.enabled:
             return None
 
@@ -32,6 +32,10 @@ class DeepSeekClient:
         }
         if response_format:
             payload["response_format"] = response_format
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+        if temperature is not None:
+            payload["temperature"] = temperature
 
         request = urllib.request.Request(
             DEEPSEEK_API_URL,
@@ -47,3 +51,44 @@ class DeepSeekClient:
             data = json.loads(response.read().decode("utf-8"))
 
         return data["choices"][0]["message"]["content"]
+
+    def chat_stream(self, messages, timeout=30, max_tokens=None, temperature=None):
+        if not self.enabled:
+            return
+
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": True,
+        }
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+        if temperature is not None:
+            payload["temperature"] = temperature
+
+        request = urllib.request.Request(
+            DEEPSEEK_API_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Authorization": f"Bearer {self.api_key}",
+                "Content-Type": "application/json",
+            },
+            method="POST",
+        )
+
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            for raw_line in response:
+                line = raw_line.decode("utf-8").strip()
+                if not line or not line.startswith("data:"):
+                    continue
+                data = line.removeprefix("data:").strip()
+                if data == "[DONE]":
+                    break
+                try:
+                    payload = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+                delta = payload.get("choices", [{}])[0].get("delta", {})
+                content = delta.get("content")
+                if content:
+                    yield content
