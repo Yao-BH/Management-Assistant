@@ -86,7 +86,7 @@ const navItems = [
 
     <main class="workspace">
       <header class="topbar">
-        <h1>Analytical board</h1>
+        <h1>团队管理工作台</h1>
         <div class="top-actions">
           <AgentFeed />
           <button class="icon-btn" type="button" aria-label="日历"><CalendarDays /></button>

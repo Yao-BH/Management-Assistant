@@ -6,9 +6,8 @@ import type { Employee } from "../types";
 
 const store = useAgentStore();
 
-function latestCommunicationText(employee: Employee) {
-  const record = store.latestCommunication(employee.key);
-  return record?.date || employee.communication || "暂无记录";
+function employeeStatusText(employee: Employee) {
+  return employee.analysisStatus || employee.keyEvents || employee.communication || employee.reason || "待补充状态备注";
 }
 
 function normalizeEmployeeRecord(row: Record<string, unknown>) {
@@ -30,7 +29,7 @@ function normalizeEmployeeRecord(row: Record<string, unknown>) {
     probationEndDate: pick("转正日期", "probationEndDate"),
     growthSummary: pick("成长", "成长摘要", "growthSummary"),
     awardsSummary: pick("获奖", "奖励", "awardsSummary"),
-    keyEvents: pick("备注", "关键事件", "keyEvents")
+    keyEvents: pick("状态", "状态备注", "备注", "keyEvents")
   };
 }
 
@@ -111,7 +110,7 @@ async function parseWorkbook(file: File) {
             <span>岗位</span>
             <span>阶段</span>
             <span>风险等级</span>
-            <span>最近沟通</span>
+            <span>状态</span>
             <span>操作</span>
           </div>
           <div
@@ -126,7 +125,7 @@ async function parseWorkbook(file: File) {
             <span>{{ employee.role || "未填写" }}</span>
             <span><em class="stage-pill">{{ employee.lifecycle?.stage || "待分析" }}</em></span>
             <span><em class="risk-badge" :class="riskClass(employee)">{{ employee.level || "待分析" }}</em></span>
-            <span>{{ latestCommunicationText(employee) }}</span>
+            <span class="employee-status-note">{{ employeeStatusText(employee) }}</span>
             <span class="row-actions">
               <button type="button" @click.stop="store.openEmployeeDrawer(employee.key, true)">详情</button>
               <button type="button" @click.stop="store.deleteEmployee(employee.key)"><Trash2 /></button>

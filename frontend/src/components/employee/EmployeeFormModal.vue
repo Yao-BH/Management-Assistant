@@ -49,7 +49,7 @@ async function submit() {
       <label><span>30天请假</span><input v-model="form.leaveDays30d" type="number" min="0" step="0.5" /></label>
       <label><span>合同到期</span><input v-model="form.contractEndDate" type="date" /></label>
       <label><span>转正日期</span><input v-model="form.probationEndDate" type="date" /></label>
-      <label><span>备注</span><input v-model="form.keyEvents" placeholder="补充关键事项、管理备注" /></label>
+      <label><span>状态备注</span><input v-model="form.keyEvents" placeholder="补充心理状态、性格特点、管理备注" /></label>
       <button class="primary-btn" type="submit"><Plus /><span>新增员工</span></button>
     </form>
   </div>

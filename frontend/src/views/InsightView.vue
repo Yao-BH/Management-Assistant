@@ -91,6 +91,51 @@ const avgOvertime = computed(() => average(scopedEmployees.value.map((employee) 
 const intelligenceScore = computed(() =>
   Math.max(36, Math.min(96, Math.round(100 - riskSummary.value.watch * 3 + completionRate.value * 0.28 + communicationCoverage.value * 0.24)))
 );
+const narrativeTone = computed(() => {
+  if (riskSummary.value.watch >= 6) return "高压";
+  if (riskSummary.value.watch >= 1) return "需关注";
+  return "平稳";
+});
+const narrativeTitle = computed(() => {
+  if (riskSummary.value.watch > 0) return `${selectedDepartment.value}当前有 ${riskSummary.value.watch} 个重点关注对象`;
+  if (scopedTodos.value.length > 0) return `${selectedDepartment.value}当前风险平稳，重点在待办闭环`;
+  return `${selectedDepartment.value}当前暂无明显风险波动`;
+});
+const narrativeSummary = computed(
+  () =>
+    `AI 健康指数 ${intelligenceScore.value}，沟通覆盖 ${communicationCoverage.value}%，待办闭环 ${completionRate.value}%。建议把注意力集中在重点对象、沟通空白和未闭环动作。`
+);
+const leadingMetrics = computed(() => [
+  { label: "AI 健康指数", value: intelligenceScore.value, suffix: "", hint: narrativeTone.value },
+  { label: "重点关注", value: riskSummary.value.watch, suffix: "人", hint: `${riskSummary.value.high} 高 / ${riskSummary.value.medium} 中` },
+  { label: "闭环完成", value: completionRate.value, suffix: "%", hint: `${scopedTodos.value.filter(todoDone).length}/${scopedTodos.value.length || 0} 项` }
+]);
+const insightCards = computed(() => [
+  {
+    title: "先处理高/中风险对象",
+    value: riskSummary.value.watch,
+    suffix: "人",
+    detail: riskSummary.value.watch ? "建议优先安排 1 对 1 与风险确认。" : "当前未识别明显高/中风险对象。",
+    tone: "risk",
+    icon: ShieldAlert
+  },
+  {
+    title: "补齐沟通覆盖",
+    value: communicationCoverage.value,
+    suffix: "%",
+    detail: "近 30 天有沟通记录的员工占比。",
+    tone: "communication",
+    icon: MessageSquareText
+  },
+  {
+    title: "推动待办闭环",
+    value: completionRate.value,
+    suffix: "%",
+    detail: `${scopedTodos.value.filter((todo) => !todoDone(todo)).length} 项仍需跟进。`,
+    tone: "closure",
+    icon: CheckCircle2
+  }
+]);
 
 const kpis = computed(() => [
   {
@@ -236,12 +281,12 @@ function barWidth(value: number, max: number) {
 </script>
 
 <template>
-  <section class="view-panel insight-view active">
-    <section class="insight-hero panel">
-      <div class="insight-hero-copy">
-        <p class="eyebrow">Intelligence Dashboard</p>
-        <h2>组织智能驾驶舱</h2>
-        <p>基于员工档案、生命周期、职级、沟通记录、风险信号和待办闭环，实时扫描团队健康度和管理动作进展。</p>
+  <section class="view-panel insight-view insight-story-view active">
+    <section class="panel insight-narrative">
+      <div class="insight-narrative-copy">
+        <p class="eyebrow">Intelligence Narrative</p>
+        <h2>{{ narrativeTitle }}</h2>
+        <p>{{ narrativeSummary }}</p>
         <div class="insight-filters" aria-label="部门筛选">
           <button
             v-for="department in departments"
@@ -254,134 +299,29 @@ function barWidth(value: number, max: number) {
           </button>
         </div>
       </div>
-
-      <div class="command-orb" :style="{ '--score': `${intelligenceScore}%` }">
-        <div>
-          <BrainCircuit />
-          <strong>{{ intelligenceScore }}</strong>
-          <span>AI 健康指数</span>
+      <div class="narrative-metrics" aria-label="核心指标">
+        <div v-for="item in leadingMetrics" :key="item.label">
+          <span>{{ item.label }}</span>
+          <strong>{{ item.value }}<em>{{ item.suffix }}</em></strong>
+          <small>{{ item.hint }}</small>
         </div>
       </div>
     </section>
 
-    <section class="insight-kpi-grid">
-      <article v-for="item in kpis" :key="item.label" class="insight-kpi-card panel" :class="item.tone">
+    <section class="insight-priority-grid" aria-label="重点洞察">
+      <article v-for="item in insightCards" :key="item.title" class="panel insight-priority-card" :class="item.tone">
         <component :is="item.icon" />
-        <span>{{ item.label }}</span>
+        <span>{{ item.title }}</span>
         <strong>{{ item.value }}<em>{{ item.suffix }}</em></strong>
-        <small>{{ item.hint }}</small>
+        <p>{{ item.detail }}</p>
       </article>
     </section>
 
-    <section class="insight-main-grid">
-      <article class="panel risk-command-card">
+    <section class="insight-workbench">
+      <article class="panel focus-rank-card insight-lead-card">
         <div class="section-head compact">
           <div>
-            <p class="eyebrow">Risk Radar</p>
-            <h2>风险结构雷达</h2>
-          </div>
-          <Radar />
-        </div>
-
-        <div class="risk-orbit" aria-hidden="true">
-          <span></span>
-          <span></span>
-          <span></span>
-          <i class="hot"></i>
-          <i class="warm"></i>
-          <i class="safe"></i>
-        </div>
-
-        <div class="risk-bar-stack">
-          <div v-for="item in riskBars" :key="item.label" :class="item.tone">
-            <span>{{ item.label }}</span>
-            <em><b :style="{ width: barWidth(item.value, scopedEmployees.length || 1) }"></b></em>
-            <strong>{{ item.value }}</strong>
-          </div>
-        </div>
-      </article>
-
-      <article class="panel heatmap-card">
-        <div class="section-head compact">
-          <div>
-            <p class="eyebrow">Department Matrix</p>
-            <h2>部门热力矩阵</h2>
-          </div>
-          <Network />
-        </div>
-        <div class="department-heatmap">
-          <button
-            v-for="item in departmentData"
-            :key="item.label"
-            type="button"
-            :class="{ active: selectedDepartment === item.label }"
-            :style="{ '--heat': `${Math.max(18, item.riskRate)}%` }"
-            @click="selectedDepartment = item.label"
-          >
-            <strong>{{ item.label }}</strong>
-            <span>{{ item.value }} 人</span>
-            <em>关注率 {{ item.riskRate }}%</em>
-          </button>
-        </div>
-      </article>
-
-      <article class="panel trend-card">
-        <div class="section-head compact">
-          <div>
-            <p class="eyebrow">Communication Pulse</p>
-            <h2>近 10 天沟通脉冲</h2>
-          </div>
-          <Activity />
-        </div>
-        <div class="pulse-chart">
-          <div v-for="item in trendDays" :key="item.key">
-            <i :style="{ height: `${item.height}%` }"></i>
-            <strong>{{ item.value }}</strong>
-            <span>{{ item.key }}</span>
-          </div>
-        </div>
-      </article>
-    </section>
-
-    <section class="insight-lower-grid">
-      <article class="panel lifecycle-card">
-        <div class="section-head compact">
-          <div>
-            <p class="eyebrow">Lifecycle</p>
-            <h2>生命周期分布</h2>
-          </div>
-          <UserRoundCheck />
-        </div>
-        <div class="lifecycle-lanes">
-          <div v-for="item in lifecycleData" :key="item.label">
-            <span>{{ item.label }}</span>
-            <em><b :style="{ width: barWidth(item.value, maxValue(lifecycleData)) }"></b></em>
-            <strong>{{ item.value }}</strong>
-          </div>
-        </div>
-      </article>
-
-      <article class="panel level-card">
-        <div class="section-head compact">
-          <div>
-            <p class="eyebrow">Job Level</p>
-            <h2>职级梯队</h2>
-          </div>
-          <Gauge />
-        </div>
-        <div class="level-rings">
-          <div v-for="item in levelData" :key="item.label">
-            <strong>{{ item.label }}</strong>
-            <span :style="{ height: `${Math.max(22, Math.round((item.value / maxValue(levelData)) * 100))}%` }"></span>
-            <em>{{ item.value }}</em>
-          </div>
-        </div>
-      </article>
-
-      <article class="panel focus-rank-card">
-        <div class="section-head compact">
-          <div>
-            <p class="eyebrow">AI Focus Rank</p>
+            <p class="eyebrow">Action Focus</p>
             <h2>智能关注榜</h2>
           </div>
           <Sparkles />
@@ -409,22 +349,101 @@ function barWidth(value: number, max: number) {
         </div>
       </article>
 
-      <article class="panel todo-closure-card">
+      <aside class="insight-detail-stack">
+        <article class="panel risk-command-card">
+          <div class="section-head compact">
+            <div>
+              <p class="eyebrow">Risk Structure</p>
+              <h2>风险结构</h2>
+            </div>
+            <ShieldAlert />
+          </div>
+          <div class="risk-bar-stack">
+            <div v-for="item in riskBars" :key="item.label" :class="item.tone">
+              <span>{{ item.label }}</span>
+              <em><b :style="{ width: barWidth(item.value, scopedEmployees.length || 1) }"></b></em>
+              <strong>{{ item.value }}</strong>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel todo-closure-card">
+          <div class="section-head compact">
+            <div>
+              <p class="eyebrow">Action Closure</p>
+              <h2>待办闭环</h2>
+            </div>
+            <ClipboardList />
+          </div>
+          <div class="closure-meter">
+            <span :style="{ width: `${completionRate}%` }"></span>
+            <strong>{{ completionRate }}%</strong>
+          </div>
+          <div class="closure-stats">
+            <div><span>待处理</span><strong>{{ scopedTodos.filter((todo) => !todo.status || todo.status.includes("待")).length }}</strong></div>
+            <div><span>处理中</span><strong>{{ scopedTodos.filter((todo) => todo.status === "处理中" || todo.status === "进行中").length }}</strong></div>
+            <div><span>已完成</span><strong>{{ scopedTodos.filter(todoDone).length }}</strong></div>
+          </div>
+        </article>
+      </aside>
+    </section>
+
+    <section class="insight-detail-grid" aria-label="可交互细节">
+      <article class="panel heatmap-card">
         <div class="section-head compact">
           <div>
-            <p class="eyebrow">Action Closure</p>
-            <h2>待办闭环结构</h2>
+            <p class="eyebrow">Department Matrix</p>
+            <h2>部门风险矩阵</h2>
           </div>
-          <ClipboardList />
+          <Network />
         </div>
-        <div class="closure-meter">
-          <span :style="{ width: `${completionRate}%` }"></span>
-          <strong>{{ completionRate }}%</strong>
+        <div class="department-heatmap">
+          <button
+            v-for="item in departmentData"
+            :key="item.label"
+            type="button"
+            :class="{ active: selectedDepartment === item.label }"
+            :style="{ '--heat': `${Math.max(18, item.riskRate)}%` }"
+            @click="selectedDepartment = item.label"
+          >
+            <strong>{{ item.label }}</strong>
+            <span>{{ item.value }} 人</span>
+            <em>关注率 {{ item.riskRate }}%</em>
+          </button>
         </div>
-        <div class="closure-stats">
-          <div><span>待处理</span><strong>{{ scopedTodos.filter((todo) => !todo.status || todo.status.includes("待")).length }}</strong></div>
-          <div><span>处理中</span><strong>{{ scopedTodos.filter((todo) => todo.status === "处理中" || todo.status === "进行中").length }}</strong></div>
-          <div><span>已完成</span><strong>{{ scopedTodos.filter(todoDone).length }}</strong></div>
+      </article>
+
+      <article class="panel trend-card">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow">Communication Pulse</p>
+            <h2>近 10 天沟通</h2>
+          </div>
+          <Activity />
+        </div>
+        <div class="pulse-chart">
+          <div v-for="item in trendDays" :key="item.key">
+            <i :style="{ height: `${item.height}%` }"></i>
+            <strong>{{ item.value }}</strong>
+            <span>{{ item.key }}</span>
+          </div>
+        </div>
+      </article>
+
+      <article class="panel lifecycle-card">
+        <div class="section-head compact">
+          <div>
+            <p class="eyebrow">Lifecycle</p>
+            <h2>生命周期分布</h2>
+          </div>
+          <UserRoundCheck />
+        </div>
+        <div class="lifecycle-lanes">
+          <div v-for="item in lifecycleData" :key="item.label">
+            <span>{{ item.label }}</span>
+            <em><b :style="{ width: barWidth(item.value, maxValue(lifecycleData)) }"></b></em>
+            <strong>{{ item.value }}</strong>
+          </div>
         </div>
       </article>
     </section>

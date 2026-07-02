@@ -8,6 +8,11 @@ const emptyBrief: Brief = {
   summary: "正在读取员工档案、沟通记录和待办。",
   insights: []
 };
+const initialAssistantMessage: ChatMessage = {
+  role: "assistant",
+  text: "你可以问我：谁最需要关注、某位员工为什么有风险、今天应该先处理哪些管理动作。"
+};
+const maxAssistantHistory = 10;
 
 function normalizeTodo(todo: TodoItem, employees: Employee[] = []): TodoItem {
   const employee = employees.find((item) => item.key === todo.employeeKey);
@@ -62,12 +67,7 @@ export const useAgentStore = defineStore("agent", {
     outlineEyebrow: "Generated Outline",
     outlineLines: [] as string[],
     outlineSource: "等待生成",
-    assistantHistory: [
-      {
-        role: "assistant",
-        text: "你可以问我：谁最需要关注、某位员工为什么有风险、今天应该先处理哪些管理动作。"
-      }
-    ] as ChatMessage[],
+    assistantHistory: [initialAssistantMessage] as ChatMessage[],
     chatLoading: false,
     agentEvents: [] as { time: string; text: string }[],
     agentFeedSignature: "",
@@ -177,9 +177,11 @@ export const useAgentStore = defineStore("agent", {
           card: reply.card,
           actions: reply.actions || []
         });
+        this.assistantHistory = [this.assistantHistory[0], ...this.assistantHistory.slice(1).slice(-maxAssistantHistory)];
         this.pushAgentEvent(`Agent 已识别“${reply.intent || intent || "团队问答"}”意图并完成回复。`);
       } catch {
         this.assistantHistory.push({ role: "assistant", text: "我暂时无法连接模型服务，请稍后再试。" });
+        this.assistantHistory = [this.assistantHistory[0], ...this.assistantHistory.slice(1).slice(-maxAssistantHistory)];
       } finally {
         this.chatLoading = false;
       }

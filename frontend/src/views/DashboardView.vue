@@ -2,6 +2,7 @@
 import SignalBoard from "../components/dashboard/SignalBoard.vue";
 import TodayFocus from "../components/dashboard/TodayFocus.vue";
 import AgentPanel from "../components/agent/AgentPanel.vue";
+import RiskTrendCard from "../components/dashboard/RiskTrendCard.vue";
 </script>
 
 <template>
@@ -10,6 +11,9 @@ import AgentPanel from "../components/agent/AgentPanel.vue";
       <SignalBoard />
       <AgentPanel />
     </section>
-    <TodayFocus />
+    <section class="dashboard-lower-grid" aria-label="今日管理与风险趋势">
+      <TodayFocus />
+      <RiskTrendCard />
+    </section>
   </section>
 </template>

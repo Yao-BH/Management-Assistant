@@ -30,7 +30,7 @@ const tabs = [
   { key: "growth", label: "成长" },
   { key: "awards", label: "获奖" },
   { key: "attendance", label: "考勤" },
-  { key: "events", label: "关键事件" }
+  { key: "events", label: "状态" }
 ];
 
 interface ProfileField {
@@ -140,7 +140,7 @@ const tabFields = computed<ProfileField[]>(() => {
     ];
   }
   return [
-    { label: "关键事件", field: "keyEvents", wide: true, multiline: true },
+    { label: "状态备注", field: "keyEvents", wide: true, multiline: true },
     { label: "风险证据", value: common.evidenceText, wide: true }
   ];
 });

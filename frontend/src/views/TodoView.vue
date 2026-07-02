@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { CheckCircle2, FileText, MessageSquareText, Play, RefreshCw, Trash2, UserRoundSearch } from "lucide-vue-next";
+import { computed, ref, watch } from "vue";
+import { CheckCircle2, ChevronLeft, ChevronRight, FileText, MessageSquareText, Play, RefreshCw, Trash2, UserRoundSearch } from "lucide-vue-next";
 import { useAgentStore } from "../stores/agentStore";
 import { signalText, todoAction, todoEvidence, todoLevelLabel, todoStatusClass } from "../utils/format";
+import type { TodoItem } from "../types";
 
 const store = useAgentStore();
+const todoPage = ref(1);
+const todoPageSize = 8;
 const selectedTodo = computed(() => store.smartTodos.find((todo) => todo.id === store.selectedTodoId));
 const selectedEmployee = computed(() => store.employees.find((employee) => employee.key === selectedTodo.value?.employeeKey));
 const selectedEvidence = computed(() => {
@@ -27,6 +30,43 @@ const groups = computed(() => [
   { label: "处理中", items: store.smartTodos.filter((todo) => isDoing(todo.status)) },
   { label: "历史待办", items: store.smartTodos.filter((todo) => isDone(todo.status)) }
 ]);
+const flatTodos = computed(() =>
+  groups.value.flatMap((group) => group.items.map((todo) => ({ group: group.label, todo })))
+);
+const totalTodoPages = computed(() => Math.max(1, Math.ceil(flatTodos.value.length / todoPageSize)));
+const pagedTodoEntries = computed(() => {
+  const start = (todoPage.value - 1) * todoPageSize;
+  return flatTodos.value.slice(start, start + todoPageSize);
+});
+const pagedGroups = computed(() => {
+  const result: Array<{ label: string; items: TodoItem[] }> = [];
+  pagedTodoEntries.value.forEach((entry) => {
+    let group = result.find((item) => item.label === entry.group);
+    if (!group) {
+      group = { label: entry.group, items: [] };
+      result.push(group);
+    }
+    group.items.push(entry.todo);
+  });
+  return result;
+});
+const todoRangeText = computed(() => {
+  if (!flatTodos.value.length) return "0 项";
+  const start = (todoPage.value - 1) * todoPageSize + 1;
+  const end = Math.min(start + todoPageSize - 1, flatTodos.value.length);
+  return `${start}-${end} / ${flatTodos.value.length} 项`;
+});
+
+watch(
+  () => store.smartTodos.length,
+  () => {
+    if (todoPage.value > totalTodoPages.value) todoPage.value = totalTodoPages.value;
+  }
+);
+
+function goTodoPage(page: number) {
+  todoPage.value = Math.min(Math.max(page, 1), totalTodoPages.value);
+}
 </script>
 
 <template>
@@ -44,10 +84,10 @@ const groups = computed(() => [
       <article class="panel todo-list-panel">
         <div class="section-head">
           <h2>智能待办队列</h2>
-          <small>{{ store.smartTodos.length }} 项</small>
+          <small>{{ todoRangeText }}</small>
         </div>
         <div class="todo-list">
-          <div v-for="group in groups" :key="group.label" class="todo-group">
+          <div v-for="group in pagedGroups" :key="group.label" class="todo-group">
             <h3 v-if="group.items.length" class="todo-section-title">{{ group.label }}</h3>
             <button
               v-for="todo in group.items"
@@ -64,6 +104,15 @@ const groups = computed(() => [
             </button>
           </div>
         </div>
+        <nav v-if="totalTodoPages > 1" class="todo-pagination" aria-label="待办分页">
+          <button type="button" :disabled="todoPage === 1" aria-label="上一页" @click="goTodoPage(todoPage - 1)">
+            <ChevronLeft />
+          </button>
+          <span>第 {{ todoPage }} / {{ totalTodoPages }} 页</span>
+          <button type="button" :disabled="todoPage === totalTodoPages" aria-label="下一页" @click="goTodoPage(todoPage + 1)">
+            <ChevronRight />
+          </button>
+        </nav>
       </article>
 
       <article class="panel todo-detail-panel selected-action-panel">
