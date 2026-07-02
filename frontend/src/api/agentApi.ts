@@ -30,6 +30,8 @@ export const agentApi = {
   saveCommunication: (record: Record<string, unknown>) => postJson<ArchivePayload>("/api/communication", { record }),
   updateCommunication: (recordId: string | number, record: Record<string, unknown>) =>
     postJson<ArchivePayload>("/api/communication/update", { recordId, record }),
+  deleteCommunication: (recordId: string | number) =>
+    postJson<ArchivePayload>("/api/communication/delete", { recordId }),
   completeCommunication: (record: Record<string, unknown>, todoId = "") =>
     postJson<ArchivePayload>("/api/communication/complete", { record, todoId }),
   communicationSummary: (employeeKey: string, todoId = "") =>

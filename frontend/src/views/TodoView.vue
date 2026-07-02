@@ -20,10 +20,12 @@ const latestRecords = computed(() =>
         .slice(0, 3)
     : []
 );
+const isDone = (status = "") => status.includes("完成") || status.includes("关闭");
+const isDoing = (status = "") => status === "处理中" || status === "进行中";
 const groups = computed(() => [
-  { label: "今日待办", items: store.smartTodos.filter((todo) => !todo.status || todo.status.includes("待") || todo.status.includes("今日")) },
-  { label: "处理中", items: store.smartTodos.filter((todo) => todo.status?.includes("处理") || todo.status?.includes("进行")) },
-  { label: "历史待办", items: store.smartTodos.filter((todo) => todo.status?.includes("完成") || todo.status?.includes("关闭")) }
+  { label: "今日待办", items: store.smartTodos.filter((todo) => !isDoing(todo.status) && !isDone(todo.status)) },
+  { label: "处理中", items: store.smartTodos.filter((todo) => isDoing(todo.status)) },
+  { label: "历史待办", items: store.smartTodos.filter((todo) => isDone(todo.status)) }
 ]);
 </script>
 
@@ -129,7 +131,7 @@ const groups = computed(() => [
             <button type="button" @click="store.updateTodoStatus(selectedTodo.id, '处理中')">
               <Play /><span>开始处理</span>
             </button>
-            <button type="button" @click="selectedTodo.employeeKey && store.openEmployeeDrawer(selectedTodo.employeeKey, true)">
+            <button type="button" @click="store.openTodoCompletion(selectedTodo.id)">
               <CheckCircle2 /><span>记录沟通并完成</span>
             </button>
             <button type="button" @click="store.deleteTodo(selectedTodo.id)"><Trash2 /><span>删除</span></button>

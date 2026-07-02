@@ -26,6 +26,7 @@ from agent_services import (
     get_archive,
     get_metrics,
     import_employees,
+    remove_communication,
     remove_employee,
     remove_todo,
     save_communication,
@@ -93,6 +94,14 @@ def communication_update(payload: Payload):
         return update_communication(payload.recordId or "", payload.record or {})
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@app.post("/api/communication/delete")
+def communication_delete(payload: Payload):
+    try:
+        return remove_communication(payload.recordId or "")
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @app.post("/api/communication/complete")

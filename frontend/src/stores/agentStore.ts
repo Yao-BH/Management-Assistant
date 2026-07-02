@@ -55,6 +55,8 @@ export const useAgentStore = defineStore("agent", {
     employeeDrawerOpen: false,
     employeeModalOpen: false,
     communicationModalOpen: false,
+    todoCompletionModalOpen: false,
+    todoCompletionTodoId: "",
     outlineModalOpen: false,
     outlineTitle: "1 对 1 沟通提纲",
     outlineEyebrow: "Generated Outline",
@@ -296,12 +298,12 @@ export const useAgentStore = defineStore("agent", {
     },
     async importEmployees(rows: Record<string, unknown>[]) {
       if (!rows.length) return;
-      this.applyArchive(await agentApi.importEmployees(rows));
+      this.applyArchive(archiveFromResponse(await agentApi.importEmployees(rows)));
       this.pushAgentEvent(`已导入 ${rows.length} 条员工档案，并刷新风险识别。`);
     },
     async deleteEmployee(employeeKey: string) {
       if (!employeeKey) return;
-      this.applyArchive(await agentApi.deleteEmployee(employeeKey));
+      this.applyArchive(archiveFromResponse(await agentApi.deleteEmployee(employeeKey)));
       this.pushAgentEvent("已删除员工档案，并同步关注队列。");
     },
     async saveCommunication(record: Record<string, unknown>) {
@@ -309,10 +311,23 @@ export const useAgentStore = defineStore("agent", {
       this.communicationModalOpen = false;
       this.pushAgentEvent("已记录沟通信息，并同步风险证据。");
     },
+    openTodoCompletion(todoId: string) {
+      this.todoCompletionTodoId = todoId;
+      this.todoCompletionModalOpen = true;
+    },
+    closeTodoCompletion() {
+      this.todoCompletionModalOpen = false;
+      this.todoCompletionTodoId = "";
+    },
     async completeCommunication(record: Record<string, unknown>, todoId = "") {
       this.applyArchive(archiveFromResponse(await agentApi.completeCommunication(record, todoId)));
       this.closeEmployeeDrawer();
+      this.closeTodoCompletion();
       this.pushAgentEvent("已完成沟通闭环，并更新待办状态。");
+    },
+    async deleteCommunication(recordId: string | number) {
+      this.applyArchive(archiveFromResponse(await agentApi.deleteCommunication(recordId)));
+      this.pushAgentEvent("已删除沟通记录，并刷新员工风险证据。");
     },
     async updateTodoStatus(todoId: string, status: string) {
       this.applyArchive(archiveFromResponse(await agentApi.updateTodoStatus(todoId, status)));

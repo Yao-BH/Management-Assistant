@@ -1,6 +1,6 @@
 from brief_services import generate_brief
 from chat_services import generate_chat_reply
-from communication_services import complete_communication_workflow, generate_communication_summary, save_communication, update_communication
+from communication_services import complete_communication_workflow, generate_communication_summary, remove_communication, save_communication, update_communication
 from context_services import build_focus_context, build_team_context, get_archive, get_metrics
 from employee_services import import_employees, remove_employee, save_employee
 from outline_services import generate_outline
@@ -25,6 +25,7 @@ __all__ = [
     "get_metrics",
     "import_employees",
     "remove_employee",
+    "remove_communication",
     "remove_todo",
     "rule_profile",
     "save_communication",

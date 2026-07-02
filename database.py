@@ -589,6 +589,16 @@ def update_communication_record(record_id, updates):
         return row_to_record(row)
 
 
+def delete_communication_record(record_id):
+    with connect() as db:
+        row = db.execute("SELECT * FROM communication_records WHERE id = ?", (record_id,)).fetchone()
+        if not row:
+            return None
+        record = row_to_record(row)
+        db.execute("DELETE FROM communication_records WHERE id = ?", (record_id,))
+        return record
+
+
 def list_todos():
     with connect() as db:
         rows = db.execute(

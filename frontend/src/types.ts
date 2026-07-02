@@ -57,6 +57,7 @@ export interface CommunicationRecord {
   date?: string;
   type?: string;
   summary?: string;
+  action?: string;
 }
 
 export interface TodoItem {

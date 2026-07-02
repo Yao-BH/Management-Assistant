@@ -13,6 +13,7 @@ import {
   BarChart3
 } from "lucide-vue-next";
 import DashboardView from "../../views/DashboardView.vue";
+import InsightView from "../../views/InsightView.vue";
 import TodoView from "../../views/TodoView.vue";
 import EmployeeArchiveView from "../../views/EmployeeArchiveView.vue";
 import AgentFeed from "../dashboard/AgentFeed.vue";
@@ -93,6 +94,7 @@ const navItems = [
       </header>
 
       <DashboardView v-if="currentView === 'dashboard'" />
+      <InsightView v-else-if="currentView === 'insight'" />
       <TodoView v-else-if="currentView === 'todo-workbench'" />
       <EmployeeArchiveView v-else-if="currentView === 'employee-archive'" />
       <section v-else class="view-panel active panel">

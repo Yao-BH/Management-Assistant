@@ -22,6 +22,16 @@ def update_communication(record_id, updates):
     return {"record": saved, "archive": get_archive()}
 
 
+def remove_communication(record_id):
+    deleted = database.delete_communication_record(record_id)
+    if not deleted:
+        raise ValueError("Communication record not found")
+    employee_key = deleted.get("employeeKey")
+    if employee_key:
+        analyze_changed_employee(employee_key)
+    return {"record": deleted, "archive": get_archive()}
+
+
 def complete_communication_workflow(record, todo_id=None):
     saved = database.add_communication_record(record)
     employee_key = saved.get("employeeKey") or record.get("employeeKey", "")
