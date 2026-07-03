@@ -3248,14 +3248,15 @@ h2 {
 .kpi-icon {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
+  width: 50px;
+  height: 50px;
   border-radius: 50%;
+
 }
 
 .kpi-icon svg {
-  width: 27px;
-  height: 27px;
+  width: 25px;
+  height: 25px;
 }
 
 .insight-stat-kpi.blue .kpi-icon { background: #eaf3ff; color: #2f74e6; }
@@ -3265,6 +3266,7 @@ h2 {
 
 .kpi-copy {
   min-width: 0;
+  margin-left: 2px;
 }
 
 .kpi-copy span,
@@ -3279,14 +3281,14 @@ h2 {
   display: block;
   margin: 12px 0 10px;
   color: #0f172a;
-  font-size: 34px;
+  font-size: 30px;
   line-height: 1;
 }
 
 .kpi-copy em {
-  margin-left: 4px;
+  margin-left: 5px;
   color: #344054;
-  font-size: 15px;
+  font-size: 19px;
   font-style: normal;
 }
 
@@ -3357,17 +3359,18 @@ h2 {
 .chart-legend {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 14px;
+  gap: 8px 25px;
   margin-top: 14px;
+  margin-left: 18px; /* 越大整体越靠右；负数向左移 */
 }
 
 .chart-legend span {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   color: #667085;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 500;
   white-space: nowrap;
 }
 
@@ -3483,18 +3486,21 @@ h2 {
 }
 
 .lifecycle-stat-list {
-  display: grid;
-  gap: 17px;
+  display: grid;   /*把整个列表变成网格布局容器*/
+  gap: 19px;      /*每一行条目之间的上下间距*/
+  padding-left: 8px;   /*左间距*/
+  padding-right: 14px;   /*右间距*/
+  margin-top: 25px;   /*上间距*/
 }
 
-.lifecycle-stat-list div {
+.lifecycle-stat-list div {   /*（核心布局，单行四栏分配）*/
   display: grid;
-  grid-template-columns: minmax(68px, 0.7fr) minmax(112px, 1fr) auto auto;
+  grid-template-columns: minmax(68px, 0.7fr) minmax(112px, 1.8fr) auto auto;
   align-items: center;
-  gap: 12px;
+  gap: 18px;
   color: #667085;
   font-size: 12px;
-  font-weight: 800;
+  font-weight: 500;
 }
 
 .lifecycle-stat-list em {
@@ -3519,6 +3525,7 @@ h2 {
 .lifecycle-stat-list small {
   text-align: right;
   white-space: nowrap;
+  font-size: 12px;
 }
 
 .action-panel {
@@ -3853,7 +3860,7 @@ h2 {
 }
 
 .reminder-dock {
-  margin-top: 18px;
+  margin-top: 18px !important;
 }
 
 .reminder-dock-head,
@@ -3869,6 +3876,7 @@ h2 {
   margin: 0;
   color: #0f172a;
   font-size: 17px;
+  font-weight: 900;
 }
 
 .reminder-tabs {
@@ -4203,8 +4211,8 @@ h2 {
 }
 
 .agent-hero .ai-orb {
-  width: 108px;
-  height: 108px;
+  width: 165px;
+  height: 165px;
   object-fit: contain;
   filter: drop-shadow(0 16px 28px rgba(48, 91, 190, 0.22));
 }
@@ -4212,7 +4220,7 @@ h2 {
 .agent-hero h2 {
   margin: 0;
   color: #26344d;
-  font-size: 16px;
+  font-size: 18px;
 }
 
 .agent-hero p {
@@ -4339,25 +4347,27 @@ h2 {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 13px; /* 这个值控制：标题栏 和 下方折线图整体的垂直距离 */
 }
 
 .risk-trend-head div {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 12px;
 }
 
 .risk-trend-head svg {
-  width: 18px;
-  height: 18px;
+  width: 38px !important;
+  height: 38px !important;
   color: #2f6df6;
+  flex-shrink: 0; /* 防止图标被挤扁 */
 }
 
 .risk-trend-head h3 {
   margin: 0;
   color: #12203a;
-  font-size: 15px;
+  font-size: 18px;
+  white-space: nowrap; /* 强制文字绝不换行 */
 }
 
 .risk-trend-head button {
@@ -4368,7 +4378,7 @@ h2 {
   color: #5f6f86;
   background: #f8fbff;
   font-size: 12px;
-  font-weight: 900;
+  font-weight: 600;
 }
 
 .risk-trend-card svg[viewBox] {
@@ -4394,7 +4404,7 @@ h2 {
 .trend-dot {
   fill: #fff;
   stroke: #3d8bff;
-  stroke-width: 3;
+  stroke-width: 2;
 }
 
 .trend-dot.latest {
@@ -4404,7 +4414,7 @@ h2 {
 .trend-label {
   fill: #7b8ba1;
   font-size: 11px;
-  font-weight: 800;
+  font-weight: 600;
 }
 
 .trend-badge rect {
@@ -4413,8 +4423,8 @@ h2 {
 
 .trend-badge text {
   fill: #fff;
-  font-size: 12px;
-  font-weight: 900;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 @media (max-width: 1240px) {

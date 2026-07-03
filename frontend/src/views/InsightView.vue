@@ -398,6 +398,7 @@ function riskDonutOption() {
   return {
     color: riskDistribution.value.map((item) => item.color),
     animationDuration: 520,
+    /* 鼠标悬浮提示框配置 */
     tooltip: {
       trigger: "item",
       appendToBody: true,
@@ -407,30 +408,32 @@ function riskDonutOption() {
       formatter: (item: { color: string; name: string; value: number }) =>
         tooltipShell(item.name, [tooltipRow(item.color, "人数占比", `${item.value} 人 · ${ratio(item.value, total)}%`)], `总人数 ${total} 人`)
     },
+    /* 底部图例 */
     legend: {
       orient: "horizontal",
       left: "center",
       bottom: 0,
-      itemWidth: 9,
-      itemHeight: 9,
+      itemWidth: 8,
+      itemHeight: 8,
       icon: "circle",
       itemGap: 10,
-      textStyle: { color: chartTextColor, fontSize: 11, fontWeight: 700 },
+      textStyle: { color: chartTextColor, fontSize: 10, fontWeight: 500 },
       formatter: (name: string) => {
         const item = riskDistribution.value.find((row) => row.label === name);
         return `${name} ${item?.value || 0}人 ${ratio(item?.value || 0, total)}%`;
       }
     },
+    /* 圆环中间自定义文字 */
     graphic: [
-      { type: "text", left: "center", top: "39%", style: { text: `${total}`, fill: "#111827", fontSize: 28, fontWeight: 900, textAlign: "center" } },
-      { type: "text", left: "center", top: "53%", style: { text: "总人数", fill: chartTextColor, fontSize: 12, fontWeight: 800, textAlign: "center" } }
+      { type: "text", left: "center", top: "32%", style: { text: `${total}`, fill: "#111827", fontSize: 28, fontWeight: 900, textAlign: "center" } },
+      { type: "text", left: "center", top: "48%", style: { text: "总人数", fill: chartTextColor, fontSize: 12, fontWeight: 800, textAlign: "center" } }
     ],
     series: [
       {
         name: "风险分布",
         type: "pie",
-        radius: ["48%", "70%"],
-        center: ["50%", "46%"],
+        radius: ["39%", "70%"],
+        center: ["50%", "42%"],
         avoidLabelOverlap: true,
         label: { show: false },
         labelLine: { show: false },
@@ -568,7 +571,7 @@ watch([riskTrendDays, departmentStacks, riskDistribution, communicationBars], re
         </div>
         <svg viewBox="0 0 120 42" aria-hidden="true">
           <polyline
-            :points="item.spark.map((value, index) => `${index * 13},${42 - value * 0.7}`).join(' ')"
+            :points="item.spark.map((value, index) => `${index * 13 + 13},${42 - value * 0.7 + 4}`).join(' ')"
             fill="none"
             stroke="currentColor"
             stroke-width="2.6"

@@ -145,14 +145,14 @@ export const useAgentStore = defineStore("agent", {
     async loadBrief() {
       this.currentBrief = {
         title: "正在生成今日研判...",
-        summary: "正在结合员工档案、风险信号、沟通记录和待办生成研判。",
+        summary: "正在结合员工档案、风险信号、沟通记录和待办生成建议。",
         insights: []
       };
       const brief = await agentApi.brief();
       this.currentBrief = { ...emptyBrief, ...brief };
       this.briefSource = brief.source || "";
       await this.loadArchive();
-      this.pushAgentEvent(`已生成今日管理研判${this.briefSource ? `：${this.briefSource}` : ""}。`);
+      this.pushAgentEvent(`已生成今日管理建议${this.briefSource ? `：${this.briefSource}` : ""}。`);
     },
     async loadTodos() {
       const payload = await agentApi.todos();
