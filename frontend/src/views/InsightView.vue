@@ -1,7 +1,10 @@
 <script setup lang="ts">
-import { computed, ref } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, shallowRef, watch } from "vue";
+import { BarChart, LineChart, PieChart } from "echarts/charts";
+import { GridComponent, GraphicComponent, LegendComponent, TooltipComponent } from "echarts/components";
+import { graphic, init, use, type EChartsType } from "echarts/core";
+import { CanvasRenderer } from "echarts/renderers";
 import {
-  CalendarDays,
   CheckCircle2,
   Download,
   HeartPulse,
@@ -17,10 +20,20 @@ import { useAgentStore } from "../stores/agentStore";
 import { riskClass } from "../utils/format";
 import type { Employee, TodoItem } from "../types";
 
+use([BarChart, CanvasRenderer, GraphicComponent, GridComponent, LegendComponent, LineChart, PieChart, TooltipComponent]);
+
 const store = useAgentStore();
 const selectedDepartment = ref("全部");
 const trendRange = ref<7 | 30>(7);
 const departmentMetric = ref<"total" | "risk">("total");
+const riskTrendChartEl = ref<HTMLElement | null>(null);
+const departmentChartEl = ref<HTMLElement | null>(null);
+const riskDonutChartEl = ref<HTMLElement | null>(null);
+const communicationChartEl = ref<HTMLElement | null>(null);
+const riskTrendChart = shallowRef<EChartsType | null>(null);
+const departmentChart = shallowRef<EChartsType | null>(null);
+const riskDonutChart = shallowRef<EChartsType | null>(null);
+const communicationChart = shallowRef<EChartsType | null>(null);
 
 const riskPalette = {
   high: "#f05266",
@@ -28,6 +41,16 @@ const riskPalette = {
   low: "#36c1a2",
   normal: "#3b82f6"
 };
+
+const riskLegend = [
+  { key: "high", label: "高风险", color: riskPalette.high },
+  { key: "medium", label: "中风险", color: riskPalette.medium },
+  { key: "low", label: "低风险", color: riskPalette.low },
+  { key: "normal", label: "稳定", color: riskPalette.normal }
+] as const;
+
+const chartTextColor = "#667085";
+const chartAxisColor = "#e9eef6";
 
 const departments = computed(() => {
   const names = Array.from(new Set(store.employees.map((employee) => employee.department || "未填写部门")));
@@ -147,33 +170,30 @@ const kpiCards = computed(() => [
 
 const riskTrendDays = computed(() => {
   const length = trendRange.value === 7 ? 7 : 10;
+  const backendTrend = store.statistics.riskTrend || [];
+  if (backendTrend.length) {
+    return backendTrend.slice(-length).map((item) => ({
+      key: item.key || String(item.date || "").slice(5, 10),
+      high: Number(item.high || 0),
+      medium: Number(item.medium || 0),
+      low: Number(item.low || 0),
+      normal: Number(item.normal || 0)
+    }));
+  }
   const baseline = riskSummary.value;
   const days = Array.from({ length }, (_, index) => {
     const date = new Date();
     date.setDate(date.getDate() - (length - 1 - index));
-    const wobble = (index % 3) - 1;
     return {
       key: date.toISOString().slice(5, 10),
-      high: Math.max(0, baseline.high + wobble),
-      medium: Math.max(0, baseline.medium + (index % 2)),
-      low: Math.max(0, baseline.low + ((index + 1) % 3) - 1),
-      normal: Math.max(0, baseline.normal + (index % 2 ? 1 : 0))
+      high: baseline.high,
+      medium: baseline.medium,
+      low: baseline.low,
+      normal: baseline.normal
     };
   });
-  const max = Math.max(...days.flatMap((item) => [item.high, item.medium, item.low, item.normal]), 1);
-  return days.map((item, index) => ({
-    ...item,
-    x: 8 + index * (84 / Math.max(length - 1, 1)),
-    highY: 88 - (item.high / max) * 72,
-    mediumY: 88 - (item.medium / max) * 72,
-    lowY: 88 - (item.low / max) * 72,
-    normalY: 88 - (item.normal / max) * 72
-  }));
+  return days;
 });
-
-function pointsFor(key: "highY" | "mediumY" | "lowY" | "normalY") {
-  return riskTrendDays.value.map((item) => `${item.x},${item[key]}`).join(" ");
-}
 
 const departmentStacks = computed(() => {
   const raw = Object.entries(countBy(store.employees, (employee) => employee.department || "未填写部门"))
@@ -197,17 +217,6 @@ const riskDistribution = computed(() => [
   { label: "低风险", value: riskSummary.value.low, color: riskPalette.low },
   { label: "稳定", value: riskSummary.value.normal, color: riskPalette.normal }
 ]);
-
-const donutStyle = computed(() => {
-  const total = Math.max(riskSummary.value.total, 1);
-  let cursor = 0;
-  const slices = riskDistribution.value.map((item) => {
-    const start = cursor;
-    cursor += (item.value / total) * 100;
-    return `${item.color} ${start}% ${cursor}%`;
-  });
-  return { background: `conic-gradient(${slices.join(", ")})` };
-});
 
 const communicationBars = computed(() => {
   const days = Array.from({ length: 7 }, (_, index) => {
@@ -239,9 +248,293 @@ const todoStats = computed(() => {
   return { pending, doing, done };
 });
 
-function barWidth(value: number, total: number) {
-  return `${Math.max(value ? 5 : 0, ratio(value, Math.max(total, 1)))}%`;
+function tooltipShell(title: string, rows: string[], footer = "") {
+  return `
+    <div class="echart-tooltip">
+      <strong>${title}</strong>
+      ${rows.join("")}
+      ${footer ? `<em>${footer}</em>` : ""}
+    </div>
+  `;
 }
+
+function tooltipRow(color: string, label: string, value: string) {
+  return `<span><i style="background:${color}"></i>${label}<b>${value}</b></span>`;
+}
+
+function commonGrid() {
+  return {
+    top: 22,
+    right: 16,
+    bottom: 38,
+    left: 24,
+    containLabel: true
+  };
+}
+
+function riskTrendOption() {
+  const days = riskTrendDays.value;
+  const maxValue = Math.max(...days.flatMap((item) => [item.high, item.medium, item.low, item.normal]), 1);
+  const yMax = Math.max(8, Math.ceil(maxValue * 1.22));
+  return {
+    color: riskLegend.map((item) => item.color),
+    animationDuration: 520,
+    grid: commonGrid(),
+    tooltip: {
+      trigger: "axis",
+      appendToBody: true,
+      borderWidth: 0,
+      padding: 0,
+      backgroundColor: "transparent",
+      axisPointer: {
+        type: "line",
+        lineStyle: { color: "#94a3b8", type: "dashed", width: 1 },
+        label: { show: false }
+      },
+      formatter: (params: unknown) => {
+        const list = Array.isArray(params) ? params : [];
+        const title = String(list[0]?.axisValue || "");
+        const rows = list.map((item: { color: string; seriesName: string; value: number }) =>
+          tooltipRow(item.color, item.seriesName, `${item.value} 人`)
+        );
+        const total = list.reduce((sum: number, item: { value: number }) => sum + Number(item.value || 0), 0);
+        return tooltipShell(title, rows, `合计 ${total} 人 · 当前档案快照`);
+      }
+    },
+    xAxis: {
+      type: "category",
+      boundaryGap: false,
+      data: days.map((item) => item.key),
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: chartAxisColor } },
+      axisLabel: { color: chartTextColor, fontSize: 11, margin: 14, hideOverlap: true }
+    },
+    yAxis: {
+      type: "value",
+      min: 0,
+      max: yMax,
+      splitNumber: 4,
+      axisLabel: { color: chartTextColor, fontSize: 11 },
+      splitLine: { lineStyle: { color: chartAxisColor } }
+    },
+    series: [
+      { name: "高风险", key: "high", color: riskPalette.high },
+      { name: "中风险", key: "medium", color: riskPalette.medium },
+      { name: "低风险", key: "low", color: riskPalette.low },
+      { name: "稳定", key: "normal", color: riskPalette.normal }
+    ].map((series) => ({
+      name: series.name,
+      type: "line",
+      smooth: 0.35,
+      symbol: "circle",
+      symbolSize: 8,
+      showSymbol: true,
+      lineStyle: { width: 3, color: series.color },
+      itemStyle: { color: series.color, borderColor: "#fff", borderWidth: 2 },
+      emphasis: { focus: "series", scale: 1.35 },
+      data: days.map((item) => item[series.key as keyof typeof item])
+    }))
+  };
+}
+
+function departmentOption() {
+  const rows = departmentStacks.value;
+  return {
+    color: riskLegend.map((item) => item.color),
+    animationDuration: 520,
+    grid: { ...commonGrid(), top: 20, bottom: 48 },
+    tooltip: {
+      trigger: "axis",
+      appendToBody: true,
+      borderWidth: 0,
+      padding: 0,
+      backgroundColor: "transparent",
+      axisPointer: { type: "shadow", shadowStyle: { color: "rgba(47, 109, 246, 0.08)" } },
+      formatter: (params: unknown) => {
+        const list = Array.isArray(params) ? params : [];
+        const title = String(list[0]?.axisValue || "");
+        const row = rows.find((item) => item.label === title);
+        const total = row?.total || 0;
+        const values = [
+          { label: "高风险", value: row?.high || 0, color: riskPalette.high },
+          { label: "中风险", value: row?.medium || 0, color: riskPalette.medium },
+          { label: "低风险", value: row?.low || 0, color: riskPalette.low },
+          { label: "稳定", value: row?.normal || 0, color: riskPalette.normal }
+        ];
+        return tooltipShell(
+          title,
+          values.map((item) => tooltipRow(item.color, item.label, `${item.value} 人 · ${ratio(item.value, total)}%`)),
+          `合计 ${total} 人 · 点击筛选该部门`
+        );
+      }
+    },
+    xAxis: {
+      type: "category",
+      data: rows.map((item) => item.label),
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: chartAxisColor } },
+      axisLabel: { color: chartTextColor, fontSize: 11, interval: 0, margin: 14, hideOverlap: true }
+    },
+    yAxis: {
+      type: "value",
+      minInterval: 1,
+      axisLabel: { color: chartTextColor, fontSize: 11 },
+      splitLine: { lineStyle: { color: chartAxisColor } }
+    },
+    series: riskLegend.map((item) => ({
+      name: item.label,
+      type: "bar",
+      stack: "risk",
+      barWidth: 28,
+      emphasis: { focus: "series" },
+      itemStyle: { borderRadius: item.key === "normal" ? [5, 5, 0, 0] : 0 },
+      data: rows.map((row) => row[item.key])
+    }))
+  };
+}
+
+function riskDonutOption() {
+  const total = riskSummary.value.total;
+  return {
+    color: riskDistribution.value.map((item) => item.color),
+    animationDuration: 520,
+    tooltip: {
+      trigger: "item",
+      appendToBody: true,
+      borderWidth: 0,
+      padding: 0,
+      backgroundColor: "transparent",
+      formatter: (item: { color: string; name: string; value: number }) =>
+        tooltipShell(item.name, [tooltipRow(item.color, "人数占比", `${item.value} 人 · ${ratio(item.value, total)}%`)], `总人数 ${total} 人`)
+    },
+    legend: {
+      orient: "horizontal",
+      left: "center",
+      bottom: 0,
+      itemWidth: 9,
+      itemHeight: 9,
+      icon: "circle",
+      itemGap: 10,
+      textStyle: { color: chartTextColor, fontSize: 11, fontWeight: 700 },
+      formatter: (name: string) => {
+        const item = riskDistribution.value.find((row) => row.label === name);
+        return `${name} ${item?.value || 0}人 ${ratio(item?.value || 0, total)}%`;
+      }
+    },
+    graphic: [
+      { type: "text", left: "center", top: "39%", style: { text: `${total}`, fill: "#111827", fontSize: 28, fontWeight: 900, textAlign: "center" } },
+      { type: "text", left: "center", top: "53%", style: { text: "总人数", fill: chartTextColor, fontSize: 12, fontWeight: 800, textAlign: "center" } }
+    ],
+    series: [
+      {
+        name: "风险分布",
+        type: "pie",
+        radius: ["48%", "70%"],
+        center: ["50%", "46%"],
+        avoidLabelOverlap: true,
+        label: { show: false },
+        labelLine: { show: false },
+        itemStyle: { borderColor: "#fff", borderWidth: 2 },
+        emphasis: { scale: true, scaleSize: 8 },
+        data: riskDistribution.value.map((item) => ({ name: item.label, value: item.value }))
+      }
+    ]
+  };
+}
+
+function communicationOption() {
+  const days = communicationBars.value;
+  return {
+    color: ["#2f6df6"],
+    animationDuration: 520,
+    grid: { top: 20, right: 12, bottom: 34, left: 22, containLabel: true },
+    tooltip: {
+      trigger: "axis",
+      appendToBody: true,
+      borderWidth: 0,
+      padding: 0,
+      backgroundColor: "transparent",
+      axisPointer: { type: "shadow", shadowStyle: { color: "rgba(47, 109, 246, 0.08)" } },
+      formatter: (params: unknown) => {
+        const item = Array.isArray(params) ? params[0] : null;
+        return tooltipShell(String(item?.axisValue || ""), [tooltipRow("#2f6df6", "主动沟通", `${Number(item?.value || 0)} 条`)]);
+      }
+    },
+    xAxis: {
+      type: "category",
+      data: days.map((item) => item.key),
+      axisTick: { show: false },
+      axisLine: { lineStyle: { color: chartAxisColor } },
+      axisLabel: { color: chartTextColor, fontSize: 11, hideOverlap: true }
+    },
+    yAxis: {
+      type: "value",
+      minInterval: 1,
+      axisLabel: { color: chartTextColor, fontSize: 11 },
+      splitLine: { lineStyle: { color: chartAxisColor } }
+    },
+    series: [
+      {
+        name: "主动沟通",
+        type: "bar",
+        barWidth: 22,
+        itemStyle: {
+          borderRadius: [5, 5, 2, 2],
+          color: new graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: "#2f6df6" },
+            { offset: 1, color: "#75a7ff" }
+          ])
+        },
+        emphasis: { itemStyle: { shadowBlur: 12, shadowColor: "rgba(47, 109, 246, 0.22)" } },
+        data: days.map((item) => item.value)
+      }
+    ]
+  };
+}
+
+function ensureCharts() {
+  if (riskTrendChartEl.value && !riskTrendChart.value) riskTrendChart.value = init(riskTrendChartEl.value);
+  if (departmentChartEl.value && !departmentChart.value) {
+    departmentChart.value = init(departmentChartEl.value);
+    departmentChart.value.on("click", (params) => {
+      if (typeof params.name === "string") selectedDepartment.value = params.name;
+    });
+  }
+  if (riskDonutChartEl.value && !riskDonutChart.value) riskDonutChart.value = init(riskDonutChartEl.value);
+  if (communicationChartEl.value && !communicationChart.value) communicationChart.value = init(communicationChartEl.value);
+}
+
+function renderCharts() {
+  nextTick(() => {
+    ensureCharts();
+    riskTrendChart.value?.setOption(riskTrendOption(), true);
+    departmentChart.value?.setOption(departmentOption(), true);
+    riskDonutChart.value?.setOption(riskDonutOption(), true);
+    communicationChart.value?.setOption(communicationOption(), true);
+  });
+}
+
+function resizeCharts() {
+  riskTrendChart.value?.resize();
+  departmentChart.value?.resize();
+  riskDonutChart.value?.resize();
+  communicationChart.value?.resize();
+}
+
+onMounted(() => {
+  renderCharts();
+  window.addEventListener("resize", resizeCharts);
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener("resize", resizeCharts);
+  riskTrendChart.value?.dispose();
+  departmentChart.value?.dispose();
+  riskDonutChart.value?.dispose();
+  communicationChart.value?.dispose();
+});
+
+watch([riskTrendDays, departmentStacks, riskDistribution, communicationBars], renderCharts, { deep: true });
 </script>
 
 <template>
@@ -250,20 +543,6 @@ function barWidth(value: number, total: number) {
       <div>
         <h2>统计洞察</h2>
         <p>用数据洞察团队健康，帮助管理者精准识别风险与高效干预</p>
-      </div>
-      <div class="insight-stat-tools">
-        <button type="button" class="ai-chip">
-          <TrendingUp />
-          AI 助理
-        </button>
-        <div class="scan-chip">
-          <strong>扫描 {{ scopedEmployees.length }} 名员工</strong>
-          <span>发现 {{ riskSummary.watch }} 个关注对象 · 建议 {{ scopedTodos.filter((todo) => !todoDone(todo)).length }} 项行动</span>
-        </div>
-        <button type="button" class="date-chip">
-          <CalendarDays />
-          近 30 天
-        </button>
       </div>
     </header>
 
@@ -317,26 +596,7 @@ function barWidth(value: number, total: number) {
             <button type="button" :class="{ active: trendRange === 30 }" @click="trendRange = 30">近30天</button>
           </div>
         </div>
-        <div class="line-chart-wrap">
-          <svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-label="风险趋势折线图">
-            <g class="grid">
-              <line v-for="line in [16, 34, 52, 70, 88]" :key="line" x1="6" :y1="line" x2="96" :y2="line" />
-            </g>
-            <polyline :points="pointsFor('highY')" class="high-line" />
-            <polyline :points="pointsFor('mediumY')" class="medium-line" />
-            <polyline :points="pointsFor('lowY')" class="low-line" />
-            <polyline :points="pointsFor('normalY')" class="normal-line" />
-            <g>
-              <circle v-for="item in riskTrendDays" :key="`h-${item.key}`" :cx="item.x" :cy="item.highY" r="1.2" class="high-dot" />
-              <circle v-for="item in riskTrendDays" :key="`m-${item.key}`" :cx="item.x" :cy="item.mediumY" r="1.2" class="medium-dot" />
-              <circle v-for="item in riskTrendDays" :key="`l-${item.key}`" :cx="item.x" :cy="item.lowY" r="1.2" class="low-dot" />
-              <circle v-for="item in riskTrendDays" :key="`n-${item.key}`" :cx="item.x" :cy="item.normalY" r="1.2" class="normal-dot" />
-            </g>
-          </svg>
-          <div class="axis-labels">
-            <span v-for="item in riskTrendDays" :key="item.key">{{ item.key }}</span>
-          </div>
-        </div>
+        <div ref="riskTrendChartEl" class="echart-panel risk-trend-chart" aria-label="风险趋势折线图"></div>
       </article>
 
       <article class="panel stat-card department-stack-panel">
@@ -355,24 +615,7 @@ function barWidth(value: number, total: number) {
             <button type="button" :class="{ active: departmentMetric === 'risk' }" @click="departmentMetric = 'risk'">高风险人数</button>
           </div>
         </div>
-        <div class="stack-chart">
-          <button
-            v-for="item in departmentStacks"
-            :key="item.label"
-            type="button"
-            :class="{ active: selectedDepartment === item.label }"
-            @click="selectedDepartment = item.label"
-          >
-            <div class="stack-bar" :style="{ height: `${item.height}%` }">
-              <i class="high" :style="{ height: barWidth(item.high, item.total) }"></i>
-              <i class="medium" :style="{ height: barWidth(item.medium, item.total) }"></i>
-              <i class="low" :style="{ height: barWidth(item.low, item.total) }"></i>
-              <i class="normal" :style="{ height: barWidth(item.normal, item.total) }"></i>
-            </div>
-            <strong>{{ item.total }}</strong>
-            <span>{{ item.label }}</span>
-          </button>
-        </div>
+        <div ref="departmentChartEl" class="echart-panel department-chart" aria-label="各部门关注人数对比柱状图"></div>
       </article>
     </section>
 
@@ -382,22 +625,7 @@ function barWidth(value: number, total: number) {
           <h3>风险分布</h3>
           <Download />
         </div>
-        <div class="risk-donut-body">
-          <div class="risk-donut" :style="donutStyle">
-            <span>
-              <strong>{{ riskSummary.total }}</strong>
-              <em>总人数</em>
-            </span>
-          </div>
-          <div class="donut-legend">
-            <div v-for="item in riskDistribution" :key="item.label">
-              <i :style="{ background: item.color }"></i>
-              <span>{{ item.label }}</span>
-              <strong>{{ item.value }} 人</strong>
-              <em>{{ ratio(item.value, riskSummary.total) }}%</em>
-            </div>
-          </div>
-        </div>
+        <div ref="riskDonutChartEl" class="echart-panel risk-donut-chart" aria-label="风险分布环形图"></div>
       </article>
 
       <article class="panel stat-card communication-panel">
@@ -408,13 +636,7 @@ function barWidth(value: number, total: number) {
           </div>
           <MessageSquareText />
         </div>
-        <div class="mini-bars">
-          <div v-for="item in communicationBars" :key="item.key">
-            <strong>{{ item.value }}</strong>
-            <i :style="{ height: `${item.height}%` }"></i>
-            <span>{{ item.key }}</span>
-          </div>
-        </div>
+        <div ref="communicationChartEl" class="echart-panel communication-chart" aria-label="沟通脉搏柱状图"></div>
       </article>
 
       <article class="panel stat-card lifecycle-panel">

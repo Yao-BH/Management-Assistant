@@ -82,4 +82,5 @@ def get_archive():
         "todos": database.list_todos(),
         "riskSignals": database.list_risk_signals(),
         "metrics": get_metrics()["items"],
+        "statistics": database.list_statistics(),
     }

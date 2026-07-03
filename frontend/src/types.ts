@@ -92,7 +92,21 @@ export interface ArchivePayload {
   items?: TodoItem[];
   riskSignals?: RiskSignal[];
   metrics?: MetricItem[];
+  statistics?: TeamStatistics;
   source?: string;
+}
+
+export interface RiskTrendPoint {
+  date?: string;
+  key: string;
+  high: number;
+  medium: number;
+  low: number;
+  normal: number;
+}
+
+export interface TeamStatistics {
+  riskTrend?: RiskTrendPoint[];
 }
 
 export interface TodoPayload {

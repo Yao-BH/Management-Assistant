@@ -1,6 +1,6 @@
 import { defineStore } from "pinia";
 import { agentApi } from "../api/agentApi";
-import type { ArchivePayload, Brief, ChatAction, ChatMessage, CommunicationRecord, Employee, EmployeeProfile, RiskSignal, TodoItem } from "../types";
+import type { ArchivePayload, Brief, ChatAction, ChatMessage, CommunicationRecord, Employee, EmployeeProfile, RiskSignal, TeamStatistics, TodoItem } from "../types";
 import { formatEventTime, riskClass, signalText, todoAction, todoEvidence } from "../utils/format";
 
 const emptyBrief: Brief = {
@@ -33,7 +33,8 @@ function normalizeArchive(payload: ArchivePayload = {}) {
     employees,
     communicationRecords: payload.communicationRecords || [],
     smartTodos: todos,
-    riskSignals: payload.riskSignals || []
+    riskSignals: payload.riskSignals || [],
+    statistics: payload.statistics || {}
   };
 }
 
@@ -47,6 +48,7 @@ export const useAgentStore = defineStore("agent", {
     communicationRecords: [] as CommunicationRecord[],
     smartTodos: [] as TodoItem[],
     riskSignals: [] as RiskSignal[],
+    statistics: {} as TeamStatistics,
     currentBrief: emptyBrief as Brief,
     briefSource: "",
     todoSource: "",
@@ -129,6 +131,7 @@ export const useAgentStore = defineStore("agent", {
       this.communicationRecords = normalized.communicationRecords;
       this.smartTodos = normalized.smartTodos;
       this.riskSignals = normalized.riskSignals;
+      this.statistics = normalized.statistics;
       this.refreshAgentFeed("AI 已根据最新数据刷新风险、待办和关注队列。");
     },
     async loadArchive() {

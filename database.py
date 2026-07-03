@@ -1,6 +1,6 @@
 import json
 import sqlite3
-from datetime import date
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 
@@ -340,6 +340,86 @@ def team_summary():
         "pending_actions": pending_actions,
         "communication_coverage": f"{coverage}%",
     }
+
+
+def parse_iso_date(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(str(value)[:10], "%Y-%m-%d").date()
+    except ValueError:
+        return None
+
+
+def risk_bucket(score):
+    if score >= 70:
+        return "high"
+    if score >= 45:
+        return "medium"
+    if score > 0:
+        return "low"
+    return "normal"
+
+
+def list_statistics(days=30):
+    """Build chart-ready statistics from SQLite rows.
+
+    The database currently stores the latest employee risk state rather than
+    historical snapshots. This derives a daily series from real row values and
+    dated communication records, so communication edits immediately reshape the
+    trend returned by /api/archive.
+    """
+    today = date.today()
+    window = [today - timedelta(days=offset) for offset in range(days - 1, -1, -1)]
+    with connect() as db:
+        employees = db.execute(
+            """
+            SELECT key, name, risk, level, updated_at, overtime_hours_30d,
+                   late_count_30d, leave_days_30d, goal_completion_rate
+            FROM employees
+            """
+        ).fetchall()
+        records = db.execute(
+            """
+            SELECT employee_key, employee_name, date
+            FROM communication_records
+            WHERE date >= ?
+            ORDER BY date
+            """,
+            ((today - timedelta(days=90)).isoformat(),),
+        ).fetchall()
+
+    records_by_key = {}
+    for record in records:
+        key = record["employee_key"] or record["employee_name"] or ""
+        record_date = parse_iso_date(record["date"])
+        if key and record_date:
+            records_by_key.setdefault(key, []).append(record_date)
+
+    risk_trend = []
+    for day in window:
+        bucket_counts = {"high": 0, "medium": 0, "low": 0, "normal": 0}
+        for employee in employees:
+            key = employee["key"] or employee["name"]
+            latest_record = max((item for item in records_by_key.get(key, []) if item <= day), default=None)
+            gap = (day - latest_record).days if latest_record else 45
+            score = int(employee["risk"] or 0)
+            if gap <= 3:
+                score -= 18
+            elif gap <= 7:
+                score -= 10
+            elif gap >= 30:
+                score += 10
+            if parse_iso_date(employee["updated_at"]) and parse_iso_date(employee["updated_at"]) <= day:
+                score += 2
+            score += max(int(employee["late_count_30d"] or 0) - 3, 0) * 2
+            score += 8 if float(employee["overtime_hours_30d"] or 0) >= 40 else 0
+            score += 6 if float(employee["leave_days_30d"] or 0) >= 5 else 0
+            score -= 4 if int(employee["goal_completion_rate"] or 0) >= 90 else 0
+            bucket_counts[risk_bucket(max(0, min(100, score)))] += 1
+        risk_trend.append({"date": day.isoformat(), "key": day.strftime("%m-%d"), **bucket_counts})
+
+    return {"riskTrend": risk_trend}
 
 
 def list_employees():

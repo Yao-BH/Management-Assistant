@@ -11,6 +11,15 @@ export default defineConfig({
   },
   build: {
     outDir: "../dist",
-    emptyOutDir: true
+    emptyOutDir: true,
+    chunkSizeWarningLimit: 650,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          echarts: ["echarts"],
+          xlsx: ["xlsx"]
+        }
+      }
+    }
   }
 });
