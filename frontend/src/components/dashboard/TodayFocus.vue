@@ -37,9 +37,6 @@ function riskLabel(level = "normal") {
       <div class="focus-actions">
         <button class="select-btn" type="button" @click="store.loadArchive()"><RefreshCw /><span>刷新</span></button>
         <button class="primary-btn" type="button" @click="store.loadBrief()"><Sparkles /><span>生成研判</span></button>
-        <button class="select-btn detail-link" type="button" @click="store.selectedView = 'todo-workbench'">
-          <span>查看详细</span><ArrowRight />
-        </button>
       </div>
     </div>
 

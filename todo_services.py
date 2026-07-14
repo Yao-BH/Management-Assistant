@@ -4,6 +4,7 @@ import urllib.error
 import database
 from context_services import build_team_context, get_archive
 from prompts import TODO_SYSTEM_PROMPT
+from risk_engine import rule_profile
 from service_common import client, model_source, parse_json_object
 
 
@@ -63,7 +64,17 @@ def sync_employee_todo(employee):
     return database.sync_employee_system_todo(employee["key"], None)
 
 
+def recalculate_risk_state():
+    records = database.list_communication_records()
+    for employee in database.list_employees():
+        profile = rule_profile(employee, records)
+        updated = database.save_rule_analysis(employee["key"], profile, model_required=employee.get("modelRequired", False))
+        sync_employee_todo(updated)
+    return get_archive()
+
+
 def generate_todos():
+    recalculate_risk_state()
     context = build_team_context()
     try:
         content = client.chat(

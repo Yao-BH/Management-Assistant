@@ -9,6 +9,7 @@ const form = reactive({
   employeeId: "",
   department: "",
   role: "",
+  birthday: "",
   hireDate: "",
   manager: "",
   performanceRating: "",
@@ -41,6 +42,7 @@ async function submit() {
       <label><span>工号</span><input v-model="form.employeeId" placeholder="例如：E2026012" /></label>
       <label><span>部门</span><input v-model="form.department" placeholder="例如：研发部" /></label>
       <label><span>职务</span><input v-model="form.role" required placeholder="例如：后端工程师 · P5" /></label>
+      <label><span>生日</span><input v-model="form.birthday" type="date" /></label>
       <label><span>入职时间</span><input v-model="form.hireDate" type="date" /></label>
       <label><span>直属主管</span><input v-model="form.manager" placeholder="例如：姚老师" /></label>
       <label><span>当前绩效</span><input v-model="form.performanceRating" placeholder="例如：B+" /></label>

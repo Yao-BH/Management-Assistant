@@ -4,6 +4,7 @@ import urllib.error
 from context_services import build_focus_context
 from prompts import BRIEF_SYSTEM_PROMPT
 from service_common import client, model_source, parse_json_object
+from todo_services import recalculate_risk_state
 
 
 def local_brief(context):
@@ -30,6 +31,7 @@ def local_brief(context):
 
 
 def generate_brief():
+    recalculate_risk_state()
     context = build_focus_context()
     try:
         content = client.chat(

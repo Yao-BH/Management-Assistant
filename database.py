@@ -24,6 +24,7 @@ def init_db():
                 department TEXT,
                 role TEXT,
                 job_level TEXT,
+                birthday TEXT DEFAULT '',
                 hire_date TEXT,
                 manager TEXT,
                 performance_rating TEXT DEFAULT '',
@@ -111,6 +112,7 @@ def ensure_employee_columns(db):
     columns = {row["name"] for row in db.execute("PRAGMA table_info(employees)").fetchall()}
     migrations = {
         "job_level": "ALTER TABLE employees ADD COLUMN job_level TEXT DEFAULT ''",
+        "birthday": "ALTER TABLE employees ADD COLUMN birthday TEXT DEFAULT ''",
         "performance_rating": "ALTER TABLE employees ADD COLUMN performance_rating TEXT DEFAULT ''",
         "performance_trend": "ALTER TABLE employees ADD COLUMN performance_trend TEXT DEFAULT ''",
         "goal_completion_rate": "ALTER TABLE employees ADD COLUMN goal_completion_rate INTEGER DEFAULT 0",
@@ -204,6 +206,8 @@ def row_to_employee(row, risk_signals=None):
         "department": row["department"] or "",
         "role": row["role"] or "",
         "jobLevel": row["job_level"] or "",
+        "birthday": row["birthday"] or "",
+        "birthDate": row["birthday"] or "",
         "hireDate": row["hire_date"] or "",
         "manager": row["manager"] or "",
         "performanceRating": row["performance_rating"] or "",
@@ -514,7 +518,7 @@ def upsert_employee(employee):
         db.execute(
             """
             INSERT INTO employees (
-                key, name, employee_id, department, role, job_level, hire_date, manager,
+                key, name, employee_id, department, role, job_level, birthday, hire_date, manager,
                 performance_rating, performance_trend, goal_completion_rate,
                 overtime_hours_30d, late_count_30d, leave_days_30d,
                 contract_end_date, probation_end_date, mentor, growth_summary,
@@ -522,13 +526,14 @@ def upsert_employee(employee):
                 risk, level, reason, evidence_json, goal, lifecycle_stage,
                 lifecycle_detail, performance, attendance, communication,
                 suggested_action, analysis_status, data_version, model_required, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             ON CONFLICT(key) DO UPDATE SET
                 name=excluded.name,
                 employee_id=excluded.employee_id,
                 department=excluded.department,
                 role=excluded.role,
                 job_level=excluded.job_level,
+                birthday=excluded.birthday,
                 hire_date=excluded.hire_date,
                 manager=excluded.manager,
                 performance_rating=excluded.performance_rating,
@@ -556,6 +561,7 @@ def upsert_employee(employee):
                 employee.get("department", ""),
                 employee.get("role", ""),
                 employee.get("jobLevel", ""),
+                employee.get("birthday") or employee.get("birthDate", ""),
                 employee.get("hireDate", ""),
                 employee.get("manager", ""),
                 employee.get("performanceRating", ""),

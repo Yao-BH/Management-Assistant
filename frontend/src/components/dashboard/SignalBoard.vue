@@ -41,9 +41,15 @@ const communicationSummary = computed(() => {
 
 function daysUntil(monthDay?: string) {
   if (!monthDay) return Number.POSITIVE_INFINITY;
-  const parts = monthDay.split("-").map(Number);
-  if (parts.length < 2 || parts.some(Number.isNaN)) return Number.POSITIVE_INFINITY;
+  const raw = String(monthDay);
   const now = new Date();
+  const fullDate = raw.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (fullDate) {
+    const target = new Date(Number(fullDate[1]), Number(fullDate[2]) - 1, Number(fullDate[3]));
+    return Math.ceil((target.getTime() - now.getTime()) / 86400000);
+  }
+  const parts = raw.split("-").map(Number);
+  if (parts.length < 2 || parts.some(Number.isNaN)) return Number.POSITIVE_INFINITY;
   const target = new Date(now.getFullYear(), parts[0] - 1, parts[1]);
   if (target < now) target.setFullYear(now.getFullYear() + 1);
   return Math.ceil((target.getTime() - now.getTime()) / 86400000);
@@ -80,7 +86,7 @@ const reminderItems = computed(() => {
   return employees
     .map((employee) => ({ employee, date: employee.contractEndDate || employee.probationEndDate || "", type: employee.contractEndDate ? "合同提醒" : "试用期提醒", action: "确认续约、转正或沟通安排" }))
     .filter((item) => item.date)
-    .sort((a, b) => String(a.date).localeCompare(String(b.date)))
+    .sort((a, b) => daysUntil(a.date) - daysUntil(b.date))
     .slice(0, 3);
 });
 

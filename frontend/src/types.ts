@@ -17,6 +17,8 @@ export interface Employee {
   department?: string;
   role?: string;
   jobLevel?: string;
+  birthday?: string;
+  birthDate?: string;
   hireDate?: string;
   manager?: string;
   performanceRating?: string;

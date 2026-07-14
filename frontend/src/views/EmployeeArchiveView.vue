@@ -17,6 +17,7 @@ function normalizeEmployeeRecord(row: Record<string, unknown>) {
     employeeId: pick("工号", "employeeId", "员工编号"),
     department: pick("部门", "department"),
     role: pick("岗位", "职务", "role"),
+    birthday: pick("生日", "出生日期", "birthday", "birthDate"),
     hireDate: pick("入职时间", "入职日期", "hireDate"),
     manager: pick("主管", "直属主管", "manager"),
     performanceRating: pick("绩效", "当前绩效", "performanceRating"),

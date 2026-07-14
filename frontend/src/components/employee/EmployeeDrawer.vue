@@ -53,6 +53,7 @@ function syncBasicForm() {
     department: item.department || "",
     role: item.role || "",
     jobLevel: item.jobLevel || "",
+    birthday: item.birthday || item.birthDate || "",
     hireDate: item.hireDate || "",
     manager: item.manager || "",
     contractEndDate: item.contractEndDate || "",
@@ -106,6 +107,7 @@ const tabFields = computed<ProfileField[]>(() => {
   if (activeTab.value === "basic") {
     return [
       { label: "入职日期", field: "hireDate", type: "date" },
+      { label: "生日", field: "birthday", type: "date" },
       { label: "合同到期日", field: "contractEndDate", type: "date" },
       { label: "转正日期", field: "probationEndDate", type: "date" },
       { label: "生命周期阶段", value: common.lifecycleStage },

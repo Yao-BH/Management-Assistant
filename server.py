@@ -16,6 +16,7 @@ ROOT = Path(__file__).resolve().parent
 load_env(ROOT / ".env")
 
 import database
+from todo_services import recalculate_risk_state
 from agent_services import (
     add_action_todo,
     complete_communication_workflow,
@@ -65,7 +66,7 @@ app.add_middleware(
 
 @app.post("/api/archive")
 def archive():
-    return get_archive()
+    return recalculate_risk_state()
 
 
 @app.post("/api/employees")
